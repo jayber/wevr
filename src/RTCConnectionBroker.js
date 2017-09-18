@@ -1,0 +1,140 @@
+import DataChannels from './DataChannels.js';
+
+export default
+class RTCConnectionBroker {
+
+  constructor(signallingClient) {
+    let constraints = {audio: true, video: false};
+    this.audio = navigator.mediaDevices.getUserMedia(constraints);
+    this.signallingClient = signallingClient;
+    this.connections = {};
+    this.dataChannels = new DataChannels();
+    this.listen("wevr.connect", (data) => {
+      this.connectTo(data);
+    });
+    this.listen("wevr.offer", (data) => {
+      this.acceptOffer(data);
+    });
+    this.listen("wevr.answer", (data) => {
+      this.acceptAnswer(data);
+    });
+    this.listen("wevr.ice-candidate", (data) => {
+      this.acceptIceCandidate(data);
+    });
+    this.listen("wevr.leftgame", (data) => {
+      this.leftgame(data);
+    });
+  }
+
+  listen(event, listener) {
+    this.signallingClient.addEventListener(event, listener);
+  }
+
+  connectTo(recipient) {
+    console.log(`gonna connect to ${recipient}`);
+    let connection = new RTCPeerConnection();
+    this.connections[recipient] = connection;
+
+    this.setUpConnection(connection, recipient).then(() => {
+      this.createOfferAndSignal(connection, recipient);
+    });
+  }
+
+  setUpConnection(connection, peer) {
+    connection.oniceconnectionstatechange  = () => {
+      console.log(`state changed to ${connection.iceConnectionState}`);
+    };
+    connection.onnegotiationneeded  = () => {
+      console.log(`negotiation needed`);
+    };
+    this.handleIceCandidates(connection, peer);
+    return this.addAudio(connection, peer);
+  }
+
+  createOfferAndSignal(connection, recipient) {
+    var channel = connection.createDataChannel("data");
+    channel.onopen = (event) => {
+      this.dataChannels.addChannel(recipient,channel);
+    };
+
+    connection.createOffer().then((offer) => {
+      connection.setLocalDescription(offer);
+      this.signallingClient.signal({
+        event: "wevr.offer",
+        data: {to: recipient, payload: offer}
+      });
+    });
+  }
+
+  handleIceCandidates(connection, peer) {
+    connection.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.signallingClient.signal({
+          event: "wevr.ice-candidate",
+          data: {to: peer, payload: event.candidate}
+        });
+      }
+    };
+  }
+
+  addAudio(connection, peer) {
+    connection.ontrack = (e) => {
+      this.onaudio(e.streams[0], peer);
+    };
+    return this.audio.then((stream) => {
+      stream.getTracks().forEach(track => {
+        connection.addTrack(track, stream);
+      });
+    }).catch(function (err) {
+      console.error(err);
+    });
+  }
+
+  acceptOffer(data) {
+    console.log(`accepting offer from ${data.from}`);
+    let connection = new RTCPeerConnection();
+    connection.ondatachannel = (event) => {
+      event.channel.onopen = () => {
+        this.dataChannels.addChannel(data.from,event.channel);
+      };
+    };
+    this.connections[data.from] = connection;
+    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
+
+    this.setUpConnection(connection, data.from).then(() => {
+      this.createAnswerAndSignal(connection, data.from);
+    });
+  }
+
+  acceptAnswer(data) {
+    console.log(`accepting answer from ${data.from}`);
+    let connection = this.connections[data.from];
+    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
+  }
+
+  createAnswerAndSignal(connection, sender) {
+    connection.createAnswer().then((answer) => {
+      connection.setLocalDescription(answer);
+      this.signallingClient.signal({
+        event: "wevr.answer",
+        data: {to: sender, payload: answer}
+      });
+    });
+  }
+
+  acceptIceCandidate(data) {
+    console.log(`accepting ice-candidate from ${data.from}`);
+    let connection = this.connections[data.from];
+    connection.addIceCandidate(new RTCIceCandidate(data.payload));
+  }
+
+  leftgame(peer) {
+    this.connections[peer].close();
+    delete this.connections[peer];
+    var element = document.getElementById(peer);
+    if (element) {
+      console.log(`removing ${peer}`);
+      element.parentNode.removeChild(element);
+    }
+  }
+}
