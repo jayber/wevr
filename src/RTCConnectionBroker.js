@@ -33,7 +33,18 @@ class RTCConnectionBroker {
 
   connectTo(recipient) {
     console.log(`gonna connect to ${recipient}`);
-    let connection = new RTCPeerConnection();
+    var configuration = {
+      iceServers: [{
+        urls: [
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+          "stun:stun3.l.google.com:19302",
+          "stun:stun4.l.google.com:19302"
+        ]
+      }]
+    };
+    let connection = new RTCPeerConnection(configuration);
     this.connections[recipient] = connection;
 
     this.setUpConnection(connection, recipient).then(() => {
@@ -42,10 +53,10 @@ class RTCConnectionBroker {
   }
 
   setUpConnection(connection, peer) {
-    connection.oniceconnectionstatechange  = () => {
+    connection.oniceconnectionstatechange = () => {
       serverLog(`${peer} state changed to ${connection.iceConnectionState}`);
     };
-    connection.onnegotiationneeded  = () => {
+    connection.onnegotiationneeded = () => {
       serverLog(`${peer} negotiation needed`);
     };
     this.handleIceCandidates(connection, peer);
@@ -55,7 +66,7 @@ class RTCConnectionBroker {
   createOfferAndSignal(connection, recipient) {
     var channel = connection.createDataChannel("data");
     channel.onopen = (event) => {
-      this.dataChannels.addChannel(recipient,channel);
+      this.dataChannels.addChannel(recipient, channel);
     };
 
     connection.createOffer().then((offer) => {
@@ -96,7 +107,7 @@ class RTCConnectionBroker {
     let connection = new RTCPeerConnection();
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
-        this.dataChannels.addChannel(data.from,event.channel);
+        this.dataChannels.addChannel(data.from, event.channel);
       };
     };
     this.connections[data.from] = connection;
