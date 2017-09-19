@@ -2,6 +2,7 @@ import SignallingClient from "./SignallingClient.js";
 import RTCConnectionBroker from "./RTCConnectionBroker.js";
 import StateHandler from "./StateHandler.js";
 import * as _ from 'lodash';
+import serverLog from "./Utils";
 
 AFRAME.registerSystem('wevr', {
   schema: {
@@ -29,14 +30,12 @@ AFRAME.registerSystem('wevr', {
 
   setUpPlayer(sceneEl) {
     let element = document.createElement("a-entity");
+    element.setAttribute("gamepad-controls","");
     element.innerHTML =
-      `<a-entity wevr-player wasd-controls look-controls gamepad-controls camera="userHeight:1.6">
-    <a-entity cursor
-    position="0 0 -1"
-    geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
-    material="color:lightgrey;shader:flat">
+      `<a-entity wevr-player wasd-controls look-controls camera="userHeight:1.6">
     </a-entity>
-    </a-entity>`;
+    <a-entity hand-controls="right" laser-controls="hand:right"></a-entity>
+    <a-entity hand-controls="left"></a-entity>`;
     sceneEl.appendChild(element);
   },
 
@@ -167,15 +166,16 @@ AFRAME.registerComponent('wevr-avatar', {
 AFRAME.registerComponent('wevr-player', {
   init() {
     this.system = this.el.sceneEl.systems.wevr;
-    this.setPosition(this.el);
-    this.position = this.el.getAttribute("position");
+
+    this.setPosition(this.el.parentNode);
     this.el.object3D.updateMatrixWorld();
-    this.quaternion = this.el.object3D.quaternion;
+    this.position = this.el.object3D.getWorldPosition();
+    this.quaternion = this.el.object3D.getWorldQuaternion();
     this.period = this.system.data.period;
 
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      console.log("sendTo " + peer);
+      serverLog("sendTo " + peer);
     });
   },
 
@@ -196,8 +196,8 @@ AFRAME.registerComponent('wevr-player', {
 
   tick(time, delta) {
     if (!this.lastSent || time - this.lastSent > this.period) {
-      var position = this.el.getAttribute("position");
       this.el.object3D.updateMatrixWorld(true);
+      var position = this.el.object3D.getWorldPosition();
       var quaternion = this.el.object3D.getWorldQuaternion();
 
       if (!_.isEqual(this.position, position) || !_.isEqual(this.quaternion, quaternion)) {

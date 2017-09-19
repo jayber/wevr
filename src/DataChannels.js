@@ -1,3 +1,6 @@
+
+import serverLog from "./Utils";
+
 export default
 class DataChannels {
 
@@ -17,7 +20,7 @@ class DataChannels {
 
   registerChannelHandlers(channel, peer) {
     let handler = (event) => {
-      console.log(event);
+      serverLog(`data channel ${peer}: ${event}`);
     };
     channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
     channel.onclose = handler;
@@ -26,7 +29,7 @@ class DataChannels {
 
   messageHandler(event, peer) {
     var msg = JSON.parse(event.data);
-    console.log(peer+" data channel received: " + event.data);
+    serverLog(peer+" data channel received: " + event.data);
     if (msg.event === "ready"){
       this.ready[peer] = true;
     }
