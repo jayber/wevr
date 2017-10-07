@@ -7,7 +7,7 @@ import DataChannels from "./DataChannels.js";
 AFRAME.registerSystem('wevr', {
   schema: {
     period: {default: 100},
-    signalUrl: {default: 'wevr.vrlobby.co'},
+    signalUrl: {default: 'wevr.vrlobby.co/wevr'},
     startOnLoad: {default: false}
   },
 
