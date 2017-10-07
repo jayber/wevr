@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: './src/index.js',
+  entry: './src/AutoStartSystem.js',
   output: {
     filename: 'wevr.js',
     path: path.resolve(__dirname, 'dist'),

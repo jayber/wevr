@@ -18,48 +18,24 @@ AFRAME.registerSystem('wevr', {
   start() {
     this.signaller = new SignallingClient(this.data.signalUrl);
     let broker = new RTCConnectionBroker(this.signaller);
-    this._channels = new DataChannels(broker);
-    if (this._channelsExecs) {
-      this._channelsExecs.forEach((element) => {
-        element.resolve(this._channels);
-      });
-    }
-    this.stateHandler = new StateHandler(this.signaller, this._channels);
+    this.channels = new DataChannels(broker);
+
+    this.stateHandler = new StateHandler(this.signaller, this.channels);
 
     this.setUpPlayer(this.el.sceneEl);
 
     this.setUpAudio(broker, this.el);
 
-    this.setUpAvatars(this._channels, this.el.sceneEl);
+    this.setUpAvatars(this.channels, this.el.sceneEl);
 
-    if (this.el.hasLoaded) {
-      this.signaller.start();
-    } else {
-      this.el.addEventListener("loaded", () => {
-        this.signaller.start();
-      });
-    }
-  },
-
-  getChannels() {
-    var self = this;
-    return new Promise((resolve, reject) => {
-      if (self._channels) {
-        resolve(self._channels);
-      } else {
-        if (!self._channelsExecs) {
-          self._channelsExecs = [];
-        }
-        self._channelsExecs.push({resolve, reject});
-      }
-    })
+    this.signaller.start();
   },
 
   setUpPlayer(sceneEl) {
     let element = document.createElement("a-entity");
     element.setAttribute("joysticks-movement", "");
     element.innerHTML =
-      `<a-entity wevr-player wasd-controls look-controls camera="userHeight:1.6">
+      `<a-entity wevr-player refresh-button wasd-controls look-controls camera="userHeight:1.6">
     <a-entity maybe-cursor
             visible="false"
             position="0 0 -1"

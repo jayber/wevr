@@ -1,6 +1,9 @@
 AFRAME.registerSystem('wevr-auto-start', {
   init() {
-    this.el.setAttribute("wevr","signalUrl:localhost:9000/wevr;startOnLoad:true");
+    var wevr = this.el.systems.wevr;
+    wevr.data.signalUrl = "localhost:9000/wevr";
+    wevr.data.startOnLoad = true;
+    wevr.start();
   }
 });
 

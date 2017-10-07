@@ -2,18 +2,18 @@ import * as _ from 'lodash';
 import serverLog from "./Utils";
 /*
 
-AFRAME.registerComponent('wevr', {
-  schema: {
-    period: {default: 100},
-    signalUrl: {default: 'wevr.vrlobby.co'}
-  },
+ AFRAME.registerComponent('wevr', {
+ schema: {
+ period: {default: 100},
+ signalUrl: {default: 'wevr.vrlobby.co'}
+ },
 
-  init() {
-    this.system.data.period = this.data.period;
-    this.system.data.signalUrl = this.data.signalUrl;
-    this.system.initAfterSchema();
-  }
-});*/
+ init() {
+ this.system.data.period = this.data.period;
+ this.system.data.signalUrl = this.data.signalUrl;
+ this.system.initAfterSchema();
+ }
+ });*/
 
 AFRAME.registerComponent('wevr-avatar', {
   schema: {type: "string"},
@@ -57,11 +57,10 @@ AFRAME.registerComponent('wevr-avatar', {
                 `;
     this.system = this.el.sceneEl.systems.wevr;
 
-    var channels = this.system.getChannels();
-    channels.then((dataChannels) => {
-      dataChannels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
-        this.system.updateMovement(this.el, event, this);
-      });
+    var channels = this.system.channels;
+    channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
+      this.system.updateMovement(this.el, event, this);
+
     })
   },
 
@@ -85,12 +84,11 @@ AFRAME.registerComponent('wevr-avatar-hand', {
     </a-sphere>`;
 
     this.system = this.el.sceneEl.systems.wevr;
-    var channels = this.system.getChannels();
+    var channels = this.system.channels;
 
-    channels.then((dataChannels) => {
-      dataChannels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
-        this.system.updateMovement(this.el, event, this);
-      });
+    channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
+      this.system.updateMovement(this.el, event, this);
+
     });
   },
 
@@ -109,12 +107,10 @@ AFRAME.registerComponent('wevr-player', {
     this.quaternion = this.el.object3D.getWorldQuaternion();
     this.period = this.system.data.period;
 
-    this.system.getChannels().then((dataChannels) => {
-      dataChannels.addEventListener("ready", (data, peer) => {
-        this.system.getChannels().then((dataChannels) => {
-          dataChannels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-          serverLog("sendTo " + peer);
-        });});
+    this.system.channels.addEventListener("ready", (data, peer) => {
+      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
+      serverLog("sendTo " + peer);
+
     });
   },
 
@@ -140,11 +136,10 @@ AFRAME.registerComponent('wevr-player', {
       var quaternion = this.el.object3D.getWorldQuaternion();
 
       if (!_.isEqual(this.position, position) || !_.isEqual(this.quaternion, quaternion)) {
-        this.system.getChannels().then((dataChannels) => {
-          dataChannels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
-          this.position = position;
-          this.quaternion = quaternion;
-        });
+        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
+        this.position = position;
+        this.quaternion = quaternion;
+
       }
       this.lastSent = time;
     }
@@ -182,18 +177,15 @@ AFRAME.registerComponent('wevr-player-hand', {
       this.quaternion = this.el.object3D.getWorldQuaternion();
       this.period = this.system.data.period;
 
-      this.system.getChannels().then((dataChannels) => {
-        dataChannels.addEventListener("ready", (data, peer) => {
-          this.system.getChannels().then((dataChannels) => {
-            dataChannels.sendTo(peer, `wevr.movement-init.hand`, {
-              hand: this.data,
-              position: this.position,
-              quaternion: this.quaternion
-            });
-          });
-          serverLog("sendTo hand:" + this.data + peer);
+      this.system.channels.addEventListener("ready", (data, peer) => {
+        this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
+          hand: this.data,
+          position: this.position,
+          quaternion: this.quaternion
         });
-      })
+        serverLog("sendTo hand:" + this.data + peer);
+      });
+
     } else {
       this.el.setAttribute("visible", "false");
     }
@@ -223,11 +215,9 @@ AFRAME.registerComponent('wevr-player-hand', {
         var quaternion = this.el.object3D.getWorldQuaternion();
 
         if (!_.isEqual(this.position, position) || !_.isEqual(this.quaternion, quaternion)) {
-          this.system.getChannels().then((dataChannels) => {
-            dataChannels.broadcast("wevr.movement.hands." + this.data, {
-              position: position,
-              quaternion: quaternion
-            });
+          this.system.channels.broadcast("wevr.movement.hands." + this.data, {
+            position: position,
+            quaternion: quaternion
           });
           this.position = position;
           this.quaternion = quaternion;
