@@ -27,8 +27,6 @@
   },
   "dependencies": {
     "aframe-joysticks-movement-component": "^0.1.1",
-    "jquery": "^3.2.1",
-    "lodash": "^4.17.4",
-    "webrtc-adapter": "^5.0.3"
+    "lodash": "^4.17.4"
   }
 }
