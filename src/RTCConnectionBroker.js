@@ -9,7 +9,6 @@ class RTCConnectionBroker {
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
     this.signallingClient = signallingClient;
     this.connections = {};
-    this.dataChannels = new DataChannels();
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });
@@ -25,6 +24,10 @@ class RTCConnectionBroker {
     this.listen("wevr.leftgame", (data) => {
       this.leftgame(data);
     });
+    this.listen("wevr.id", (data) => {
+      console.log(`I am ${data}`);
+      window.wevr.id = data;
+    });
   }
 
   listen(event, listener) {
@@ -37,10 +40,7 @@ class RTCConnectionBroker {
       iceServers: [{
         urls: [
           "stun:stun.l.google.com:19302",
-          "stun:stun1.l.google.com:19302",
-          "stun:stun2.l.google.com:19302",
-          "stun:stun3.l.google.com:19302",
-          "stun:stun4.l.google.com:19302"
+          "stun:stun1.l.google.com:19302"
         ]
       }]
     };
@@ -66,7 +66,7 @@ class RTCConnectionBroker {
   createOfferAndSignal(connection, recipient) {
     var channel = connection.createDataChannel("data");
     channel.onopen = (event) => {
-      this.dataChannels.addChannel(recipient, channel);
+      this.onchannel(recipient, channel);
     };
 
     connection.createOffer().then((offer) => {
@@ -107,7 +107,7 @@ class RTCConnectionBroker {
     let connection = new RTCPeerConnection();
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
-        this.dataChannels.addChannel(data.from, event.channel);
+        this.onchannel(data.from, event.channel);
       };
     };
     this.connections[data.from] = connection;
@@ -141,8 +141,10 @@ class RTCConnectionBroker {
   }
 
   leftgame(peer) {
-    this.connections[peer].close();
-    delete this.connections[peer];
+    if (this.connections[peer]) {
+      this.connections[peer].close();
+      delete this.connections[peer];
+    }
     var element = document.getElementById(peer);
     if (element) {
       serverLog(`removing ${peer}`);

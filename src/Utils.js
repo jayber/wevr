@@ -1,7 +1,7 @@
 import $ from "jquery";
 
 export default function serverLog (message) {
-  let name = readCookie('name') || '[none]';
+  let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
   $.get("log", {user: name, message: message});
 }
 

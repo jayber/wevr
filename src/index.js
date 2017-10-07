@@ -1,4 +1,4 @@
 import "./Components.js";
-import GamepadControls from "aframe-gamepad-controls";
+import "./Systems.js";
+import "aframe-joysticks-movement-component";
 
-AFRAME.registerComponent('gamepad-controls', GamepadControls);

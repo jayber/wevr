@@ -1,109 +1,27 @@
-import SignallingClient from "./SignallingClient.js";
-import RTCConnectionBroker from "./RTCConnectionBroker.js";
-import StateHandler from "./StateHandler.js";
 import * as _ from 'lodash';
 import serverLog from "./Utils";
+/*
 
-AFRAME.registerSystem('wevr', {
+AFRAME.registerComponent('wevr', {
   schema: {
     period: {default: 100},
     signalUrl: {default: 'wevr.vrlobby.co'}
   },
 
   init() {
-    this.signaller = new SignallingClient(this.data.signalUrl);
-    let broker = new RTCConnectionBroker(this.signaller);
-    this.channels = broker.dataChannels;
-
-    this.el.addEventListener("loaded", () => {
-      this.signaller.start();
-    });
-
-    this.setUpPlayer(this.el.sceneEl);
-
-    this.setUpAudio(broker, this.el);
-
-    this.setUpChannels(this.channels, this.el.sceneEl);
-
-    this.setUpStateHandler(this.signaller, this.channels, this.el);
-  },
-
-  setUpPlayer(sceneEl) {
-    let element = document.createElement("a-entity");
-    element.setAttribute("gamepad-controls","");
-    element.innerHTML =
-      `<a-entity wevr-player wasd-controls look-controls camera="userHeight:1.6">
-    </a-entity>
-    <a-entity hand-controls="right" laser-controls="hand:right"></a-entity>
-    <a-entity hand-controls="left"></a-entity>`;
-    sceneEl.appendChild(element);
-  },
-
-  setUpAudio(broker, el) {
-    broker.onaudio = (stream, peer) => {
-      let element = document.createElement("audio");
-      this.findPeerElement(peer, el).appendChild(element);
-      element.autoplay = true;
-      element.srcObject = stream;
-      element.play();
-    };
-  },
-
-  setUpStateHandler(sig, channels, el) {
-    this.stateHandler = new StateHandler(sig,channels);
-    this.stateHandler.addStateListener("#environment", (data) => {
-      el.systems['switch-environment'].setEnvironmentIndex(data.envName);
-    });
-  },
-
-  setUpChannels(channels, sceneEl) {
-    channels.addEventListener("open", (data, peer) => {
-      let element = this.createAvatar(peer, sceneEl);
-
-      channels.addEventListenerForPeer(peer, "wevr.movement", (event) => {
-        this.updateMovement(element, event);
-      });
-
-      channels.addEventListenerForPeer(peer, "wevr.movement-init", (event) => {
-        element.object3D.position.copy(new THREE.Vector3(event.position.x, event.position.y, event.position.z));
-        element.object3D.quaternion.copy(new THREE.Quaternion(event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
-        element.setAttribute("visible", "true");
-      });
-    });
-  },
-
-  createAvatar(peer, sceneEl) {
-    let element = document.createElement("a-entity");
-    element.setAttribute("wevr-avatar", "");
-    element.setAttribute("visible", "false");
-    this.findPeerElement(peer, sceneEl).appendChild(element);
-    return element;
-  },
-
-  findPeerElement(peer, sceneEl) {
-    let element = document.getElementById(peer);
-    if (!element) {
-      element = document.createElement("a-entity");
-      element.setAttribute("id", peer);
-      sceneEl.appendChild(element);
-    }
-    return element;
-  },
-
-  updateMovement(element, event) {
-    let component = element.components['wevr-avatar'];
-    component.targetPosition = new THREE.Vector3(event.position.x, event.position.y, event.position.z);
-    component.startPosition = element.object3D.position.clone();
-    component.targetRotation = new THREE.Quaternion(event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w);
-    component.timeUpdated = Date.now();
+    this.system.data.period = this.data.period;
+    this.system.data.signalUrl = this.data.signalUrl;
+    this.system.initAfterSchema();
   }
-});
+});*/
 
 AFRAME.registerComponent('wevr-avatar', {
+  schema: {type: "string"},
   init() {
     this.el.innerHTML = `<a-sphere class="head"
                           color="#5985ff"
-                          scale="0.4 0.45 0.35">
+                          position="0 -0.05 0"
+                          scale="0.25 0.3 0.2">
 
 <a-entity class="face"
                           position="0 0 -0.6">
@@ -135,31 +53,49 @@ AFRAME.registerComponent('wevr-avatar', {
                     </a-sphere>
                 </a-entity>
 
-                </a-sphere>`;
+                </a-sphere>
+                `;
     this.system = this.el.sceneEl.systems.wevr;
-    this.period = this.system.data.period;
+
+    var channels = this.system.getChannels();
+    channels.then((dataChannels) => {
+      dataChannels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
+        this.system.updateMovement(this.el, event, this);
+      });
+    })
   },
 
   tick(time, timeDelta) {
-    if (this.timeUpdated) {
-      let progress = (Date.now() - this.timeUpdated) / this.period;
-      if (progress < 1) {
-        if (this.targetPosition) {
-          this.el.object3D.position.lerpVectors(this.startPosition, this.targetPosition, progress);
-        }
-        if (this.targetRotation) {
-          this.el.object3D.quaternion.slerp(this.targetRotation, progress);
-        }
-      } else {
-        if (this.targetPosition) {
-          this.el.object3D.position.copy(this.targetPosition);
-        }
-        if (this.targetRotation) {
-          this.el.object3D.quaternion.copy(this.targetRotation);
-        }
-        this.timeUpdated = undefined;
-      }
-    }
+    this.system.makeMovementChanges(this);
+  }
+});
+
+AFRAME.registerComponent('wevr-avatar-hand', {
+  schema: {
+    peer: {type: "string"},
+    hand: {type: "string"}
+  },
+  init() {
+    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
+
+    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 -0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    </a-sphere>`;
+
+    this.system = this.el.sceneEl.systems.wevr;
+    var channels = this.system.getChannels();
+
+    channels.then((dataChannels) => {
+      dataChannels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
+        this.system.updateMovement(this.el, event, this);
+      });
+    });
+  },
+
+  tick(time, timeDelta) {
+    this.system.makeMovementChanges(this);
   }
 });
 
@@ -173,9 +109,12 @@ AFRAME.registerComponent('wevr-player', {
     this.quaternion = this.el.object3D.getWorldQuaternion();
     this.period = this.system.data.period;
 
-    this.system.channels.addEventListener("ready", (data, peer) => {
-      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      serverLog("sendTo " + peer);
+    this.system.getChannels().then((dataChannels) => {
+      dataChannels.addEventListener("ready", (data, peer) => {
+        this.system.getChannels().then((dataChannels) => {
+          dataChannels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
+          serverLog("sendTo " + peer);
+        });});
     });
   },
 
@@ -201,9 +140,11 @@ AFRAME.registerComponent('wevr-player', {
       var quaternion = this.el.object3D.getWorldQuaternion();
 
       if (!_.isEqual(this.position, position) || !_.isEqual(this.quaternion, quaternion)) {
-        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
-        this.position = position;
-        this.quaternion = quaternion;
+        this.system.getChannels().then((dataChannels) => {
+          dataChannels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
+          this.position = position;
+          this.quaternion = quaternion;
+        });
       }
       this.lastSent = time;
     }
@@ -217,5 +158,161 @@ AFRAME.registerComponent('wevr-player', {
     let x = Math.cos(angleRad) * radius;
     let y = Math.sin(angleRad) * radius;
     return {x: x, y: y};
+  }
+});
+
+
+AFRAME.registerComponent('wevr-player-hand', {
+  schema: {type: "string"},
+  init() {
+    this.system = this.el.sceneEl.systems.wevr;
+
+    this.initializeHands();
+    window.addEventListener("gamepadconnected", () => {
+      this.initializeHands()
+    });
+  },
+
+  initializeHands() {
+    this.hasHand = this.checkHand(this.data);
+    if (this.hasHand) {
+      this.el.setAttribute("visible", "true");
+      this.el.object3D.updateMatrixWorld();
+      this.position = this.el.object3D.getWorldPosition();
+      this.quaternion = this.el.object3D.getWorldQuaternion();
+      this.period = this.system.data.period;
+
+      this.system.getChannels().then((dataChannels) => {
+        dataChannels.addEventListener("ready", (data, peer) => {
+          this.system.getChannels().then((dataChannels) => {
+            dataChannels.sendTo(peer, `wevr.movement-init.hand`, {
+              hand: this.data,
+              position: this.position,
+              quaternion: this.quaternion
+            });
+          });
+          serverLog("sendTo hand:" + this.data + peer);
+        });
+      })
+    } else {
+      this.el.setAttribute("visible", "false");
+    }
+  },
+
+  checkHand(hand) {
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.toLowerCase().indexOf(hand) != -1) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  },
+
+  tick(time, delta) {
+    if (this.hasHand) {
+      if (!this.lastSent || time - this.lastSent > this.period) {
+        this.el.object3D.updateMatrixWorld(true);
+        var position = this.el.object3D.getWorldPosition();
+        var quaternion = this.el.object3D.getWorldQuaternion();
+
+        if (!_.isEqual(this.position, position) || !_.isEqual(this.quaternion, quaternion)) {
+          this.system.getChannels().then((dataChannels) => {
+            dataChannels.broadcast("wevr.movement.hands." + this.data, {
+              position: position,
+              quaternion: quaternion
+            });
+          });
+          this.position = position;
+          this.quaternion = quaternion;
+        }
+        this.lastSent = time;
+      }
+    }
+  }
+});
+
+
+AFRAME.registerComponent('maybe-cursor', {
+  init() {
+    if (!this.el.sceneEl.is('vr-mode')) {
+      this.addCursor();
+    } else {
+      this.removeCursor();
+    }
+    this.el.sceneEl.addEventListener('enter-vr', () => this.removeCursor());
+    this.el.sceneEl.addEventListener('exit-vr', () => this.addCursor());
+  },
+
+  removeCursor() {
+    this.el.removeAttribute("cursor");
+    this.el.setAttribute("visible", "false");
+  },
+
+  addCursor() {
+    this.el.setAttribute("cursor", "");
+    this.el.setAttribute("visible", "true");
+  }
+});
+
+
+AFRAME.registerComponent('refresh-button', {
+
+  types: {GAMEPAD: 'gamepad', OCULUS: 'oculus-touch', VIVE: 'vive'},
+
+  tick: function () {
+    if (!this.button) {
+      var gamepad = this.getGamepad();
+      if (gamepad) {
+        this.button = gamepad.buttons[0].pressed;
+        if (this.button) {
+          setTimeout(() => {
+            if (this.getGamepad().buttons[0].pressed) {
+              location.reload();
+            }
+            this.button = undefined;
+          }, 1000);
+        }
+      }
+    }
+  },
+
+  checkControllerType: function () {
+    var typeFound = this.types.GAMEPAD;
+    var indexFound = 0;
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.indexOf('Oculus Touch') === 0) {
+            typeFound = this.types.OCULUS;
+            indexFound = i;
+            break;
+          }
+          if (gamepad.id.indexOf('OpenVR Gamepad') === 0) {
+            typeFound = this.types.VIVE;
+            indexFound = i;
+            break;
+          }
+          indexFound = i;
+        }
+      }
+      return {index: indexFound, type: typeFound};
+    }
+    return false;
+  },
+
+  getGamepad: function () {
+    var type = this.checkControllerType();
+    return type
+      && navigator.getGamepads()[type.index];
   }
 });

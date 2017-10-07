@@ -2,8 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>A-Frame Wevr Component - Basic</title>
-    <meta name="description" content="Basic example for Wevr component.">
+    <title>A-Frame Wevr Component</title>
+    <meta name="description" content="Example for Wevr component.">
     <script src="https://aframe.io/releases/0.6.1/aframe.min.js"></script>
     <script src="https://rawgit.com/feiss/aframe-environment-component/master/dist/aframe-environment-component.min.js"></script>
     <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
@@ -20,22 +20,22 @@
             }
         });
 
-        AFRAME.registerComponent('init-environment', {
-            init: function () {
-                this.el.systems['switch-environment'].initAfterLoaded();
-            }
-        });
-
         AFRAME.registerSystem('switch-environment', {
-            initAfterLoaded: function () {
-                this.environment = document.querySelector("#environment");
-                this.name = document.querySelector("#name");
-                this.names = ['default', 'contact', 'egypt', 'checkerboard', 'forest', 'goaland', 'yavapai', 'goldmine', 'threetowers', 'poison', 'arches', 'tron', 'japan', 'dream', 'volcano', 'starry', 'osiris'];
-                this.curIndex = this.names.indexOf(this.environment.getAttribute("environment").preset);
-                this.name.setAttribute('text', 'value', this.names[this.curIndex]);
+            init: function () {
+                var self = this;
+                this.el.addEventListener("loaded", function () {
+                    self.environment = document.querySelector("#environment");
+                    self.name = document.querySelector("#name");
+                    self.names = ['default', 'contact', 'egypt', 'checkerboard', 'forest', 'goaland', 'yavapai', 'goldmine', 'threetowers', 'poison', 'arches', 'tron', 'japan', 'dream', 'volcano', 'starry', 'osiris'];
+                    self.curIndex = self.names.indexOf(self.environment.getAttribute("environment").preset);
+                    self.name.setAttribute('text', 'value', self.names[self.curIndex]);
 
-                let wevrSystem = this.el.systems.wevr;
-                this.stateHandler = wevrSystem.stateHandler;
+                    let wevrSystem = self.el.systems.wevr;
+                    self.stateHandler = wevrSystem.stateHandler;
+                    /*self.stateHandler.addStateListener("#environment", function (data) {
+                        self.setEnvironmentIndex(data.envName);
+                    });*/
+                });
             },
 
             switchEnvironment: function (up) {
@@ -69,7 +69,7 @@
     </script>
 </head>
 <body>
-<a-scene wevr="signalUrl:localhost:9000/wevr" init-environment>
+<a-scene refresh-button>
 
     <a-entity id="environment" environment="preset:japan"></a-entity>
 

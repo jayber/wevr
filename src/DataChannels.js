@@ -4,11 +4,14 @@ import serverLog from "./Utils";
 export default
 class DataChannels {
 
-  constructor() {
+  constructor(broker) {
     this.channels = {};
     this.listeners = {};
     this.peerListeners = {};
     this.ready = {};
+    broker.onchannel = (peer, dataChannel) => {
+      this.addChannel(peer, dataChannel);
+    };
   }
 
   addChannel(peer, dataChannel) {
@@ -29,7 +32,7 @@ class DataChannels {
 
   messageHandler(event, peer) {
     var msg = JSON.parse(event.data);
-    serverLog(peer+" data channel received: " + event.data);
+    console.log(peer+" data channel received: " + event.data);
     if (msg.event === "ready"){
       this.ready[peer] = true;
     }
