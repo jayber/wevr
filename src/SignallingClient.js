@@ -15,7 +15,7 @@ export default class SignallingClient {
   }
 
   connect(host, roomId) {
-    let ws = new WebSocket(`ws://${host}/${roomId}`);
+    let ws = new WebSocket(`wss://${host}/${roomId}`);
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
