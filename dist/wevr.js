@@ -28013,7 +28013,13 @@ AFRAME.registerSystem('wevr', {
 
     this.setUpAvatars(this.channels, this.el.sceneEl);
 
-    this.signaller.start();
+    if (this.el.hasLoaded) {
+      this.signaller.start();
+    } else {
+      this.el.addEventListener("loaded", () => {
+        this.signaller.start();
+      });
+    }
   },
 
   setUpPlayer(sceneEl) {

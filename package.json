@@ -26,7 +26,6 @@
     "webpack": "^3.5.5"
   },
   "dependencies": {
-    "aframe-environment-component": "^1.0.0",
     "aframe-joysticks-movement-component": "^0.1.1",
     "jquery": "^3.2.1",
     "lodash": "^4.17.4",
