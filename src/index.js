@@ -1,4 +1,4 @@
 import "./Components.js";
-import "./Systems.js";
+import "./WevrSystem.js";
 import "aframe-joysticks-movement-component";
 

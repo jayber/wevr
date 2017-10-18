@@ -1,19 +1,6 @@
 import * as _ from 'lodash';
 import serverLog from "./Utils";
-/*
 
- AFRAME.registerComponent('wevr', {
- schema: {
- period: {default: 100},
- signalUrl: {default: 'wevr.vrlobby.co'}
- },
-
- init() {
- this.system.data.period = this.data.period;
- this.system.data.signalUrl = this.data.signalUrl;
- this.system.initAfterSchema();
- }
- });*/
 
 AFRAME.registerComponent('wevr-avatar', {
   schema: {type: "string"},
@@ -66,6 +53,7 @@ AFRAME.registerComponent('wevr-avatar', {
 
   tick(time, timeDelta) {
     this.system.makeMovementChanges(this);
+    this.system.positionalAudio.makeAudioPositionChanges(this.data, this.targetPosition);
   }
 });
 
@@ -88,7 +76,6 @@ AFRAME.registerComponent('wevr-avatar-hand', {
 
     channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
       this.system.updateMovement(this.el, event, this);
-
     });
   },
 
@@ -139,7 +126,7 @@ AFRAME.registerComponent('wevr-player', {
         this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
         this.position = position;
         this.quaternion = quaternion;
-
+        this.system.positionalAudio.updateListener(this.el.object3D.matrixWorld);
       }
       this.lastSent = time;
     }

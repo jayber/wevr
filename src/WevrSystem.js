@@ -2,6 +2,9 @@ import SignallingClient from "./SignallingClient.js";
 import RTCConnectionBroker from "./RTCConnectionBroker.js";
 import StateHandler from "./StateHandler.js";
 import DataChannels from "./DataChannels.js";
+import PositionalAudio from "./PositionalAudio.js";
+import {detect} from 'detect-browser';
+import * as THREE from 'three';
 
 
 AFRAME.registerSystem('wevr', {
@@ -19,8 +22,8 @@ AFRAME.registerSystem('wevr', {
     this.signaller = new SignallingClient(this.data.signalUrl);
     let broker = new RTCConnectionBroker(this.signaller);
     this.channels = new DataChannels(broker);
-
     this.stateHandler = new StateHandler(this.signaller, this.channels);
+    this.positionalAudio = new PositionalAudio();
 
     this.setUpPlayer(this.el.sceneEl);
 
@@ -39,6 +42,7 @@ AFRAME.registerSystem('wevr', {
 
   setUpPlayer(sceneEl) {
     let element = document.createElement("a-entity");
+    element.setAttribute("id", "player");
     element.setAttribute("joysticks-movement", "");
     element.innerHTML =
       `<a-entity wevr-player refresh-button wasd-controls look-controls camera="userHeight:1.6">
@@ -53,14 +57,25 @@ AFRAME.registerSystem('wevr', {
     sceneEl.appendChild(element);
   },
 
-  setUpAudio(broker, el) {
+  setUpAudio(broker, sceneEl) {
     broker.onaudio = (stream, peer) => {
-      let element = document.createElement("audio");
-      this.findPeerElement(peer, el).appendChild(element);
-      element.autoplay = true;
-      element.srcObject = stream;
-      element.play();
+      const browser = detect();
+      switch (browser && browser.name) {
+        case 'chrome':
+          this.useAudioElement(stream, peer, sceneEl);
+          break;
+        default:
+          this.positionalAudio.usePositionalAudio(stream, peer);
+      }
     };
+  },
+
+  useAudioElement(stream, peer, el) {
+    let element = document.createElement("audio");
+    this.findPeerElement(peer, el).appendChild(element);
+    element.autoplay = true;
+    element.srcObject = stream;
+    element.play();
   },
 
   setUpAvatars(channels, sceneEl) {
@@ -114,6 +129,7 @@ AFRAME.registerSystem('wevr', {
       if (progress < 1) {
         if (source.targetPosition) {
           source.el.object3D.position.lerpVectors(source.startPosition, source.targetPosition, progress);
+
         }
         if (source.targetRotation) {
           source.el.object3D.quaternion.slerp(source.targetRotation, progress);
