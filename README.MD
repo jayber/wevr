@@ -9,6 +9,6 @@ Finally wevr has support for game scope state (i.e. key/value pairs that are syn
 
 Just add:
 
-     &lt;script src="https://jayber.github.io/wevr/dist/wevr.js"&gt;&lt;/script&gt;
+    <script src="https://jayber.github.io/wevr/dist/wevr.js"></script>
 
 to your page
