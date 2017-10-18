@@ -6,3 +6,9 @@ Then avatars for every user who visits your page at the same time will be create
 with positional audio if supported (i.e. Firefox).
 
 Finally wevr has support for game scope state (i.e. key/value pairs that are synched to all users, as well as any new users who join later on). Documentation to follow.
+
+Just add:
+
+     &lt;script src="https://jayber.github.io/wevr/dist/wevr.js"&gt;&lt;/script&gt;
+
+to your page
