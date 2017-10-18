@@ -16,6 +16,6 @@ to your page.
 Wevr uses WebRTC to sync players with avatars and broadcast audio, the web audio API for positional audio, and websockets for signaling and game state.
 VRLobby.co provides a server for WebRTC signalling and to store game state: https://github.com/jayber/wevr-server
 
-vrlobby.co
+www.vrlobby.co
 
 Please email me at vrlobby.co@gmail.com with questions, comments, abuse, love notes etc :-D
