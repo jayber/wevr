@@ -1,3 +1,5 @@
+IN DEVELOPMENT
+
 Wevr is the one-stop-shop for adding social (i.e. multiuser) capabilities to your VR website built with aframe https://aframe.io/
 
 Just by adding the script tag to your page (after the aframe import), wevr will add player elements for camera, head tracking, hands, movement and interactions control.

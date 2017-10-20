@@ -3,6 +3,31 @@ import $ from "jquery";
 export default function serverLog (message) {
   let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
   $.get("log", {user: name, message: message});
+  console.log(message);
+}
+
+function errorLog (e, line) {
+  let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
+
+  var stack = line;
+  var data;
+  if (e.error) {
+    stack = e.error.stack;
+    data = {user: name, message: e.error.message, stack: stack};
+  } else if (e.message) {
+    if (e.stack) {
+      stack = e.stack;
+    }
+    data = {user: name, message: e.message, stack: stack};
+  } else {
+    if (!stack) {
+      stack = "[no stack available]"
+    }
+    data = {user: name, message: e, stack: stack};
+  }
+  $.get("error", data);
+
+  console.error(JSON.stringify(data));
 }
 
 
@@ -16,3 +41,9 @@ function readCookie(name) {
   }
   return null;
 }
+
+
+window.addEventListener('error', function (e, url, line) {
+  var line = (url ? url : "") + ":" + (line ? line : "");
+  errorLog(e, line);
+});
