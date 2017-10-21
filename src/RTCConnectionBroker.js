@@ -39,13 +39,11 @@ class RTCConnectionBroker {
     var configuration = {
       iceServers: [{
         urls: [
-          "stun:stun.l.google.com:19302",
-          "stun:stun1.l.google.com:19302"
+          "stun:stun.services.mozilla.org"
         ]
       }]
     };
-    let connection = new RTCPeerConnection();
-    //let connection = new RTCPeerConnection(configuration);
+    let connection = new RTCPeerConnection(configuration);
     this.connections[recipient] = connection;
 
     this.setUpConnection(connection, recipient).then(() => {
