@@ -28289,7 +28289,7 @@ class RTCConnectionBroker {
     var configuration = {
       iceServers: [{
         urls: [
-          "stun:stun.services.mozilla.org"
+          "stun:stun.l.google.com:19302"
         ]
       }]
     };
