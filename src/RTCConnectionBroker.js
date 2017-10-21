@@ -36,20 +36,22 @@ class RTCConnectionBroker {
 
   connectTo(recipient) {
     console.log(`gonna connect to ${recipient}`);
-    var configuration = {
+    this.configuration = {
       iceServers: [{
         urls: [
           "stun:stun.l.google.com:19302",
           "stun:stun1.l.google.com:19302"
         ]
-      }, {
-        urls: "turn:54.74.139.199:3478",
-        credential: "none",
-        username: "noone"
-      }],
-      iceCandidatePoolSize: 10
+      }]
     };
-    let connection = new RTCPeerConnection(configuration);
+    /*, {
+     urls: "turn:54.74.139.199:3478",
+     credential: "none",
+     username: "noone"
+     },
+     iceCandidatePoolSize: 10
+    * */
+    let connection = new RTCPeerConnection(this.configuration);
     this.connections[recipient] = connection;
 
     this.setUpConnection(connection, recipient).then(() => {
@@ -109,7 +111,7 @@ class RTCConnectionBroker {
 
   acceptOffer(data) {
     console.log(`accepting offer from ${data.from}`);
-    let connection = new RTCPeerConnection();
+    let connection = new RTCPeerConnection(this.configuration);
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
         this.onchannel(data.from, event.channel);
