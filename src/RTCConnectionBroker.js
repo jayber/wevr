@@ -44,7 +44,8 @@ class RTCConnectionBroker {
         ]
       }]
     };
-    let connection = new RTCPeerConnection(configuration);
+    let connection = new RTCPeerConnection();
+    //let connection = new RTCPeerConnection(configuration);
     this.connections[recipient] = connection;
 
     this.setUpConnection(connection, recipient).then(() => {
