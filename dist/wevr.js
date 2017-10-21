@@ -28376,13 +28376,13 @@ class RTCConnectionBroker {
   }
 
   createAnswerAndSignal(connection, sender) {
-    connection.createAnswer().then((answer) => {
+    /*connection.createAnswer().then((answer) => {
       connection.setLocalDescription(answer);
       this.signallingClient.signal({
         event: "wevr.answer",
         data: {to: sender, payload: answer}
       });
-    });
+    });*/
   }
 
   acceptIceCandidate(data) {
