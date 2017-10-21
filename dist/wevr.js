@@ -28289,9 +28289,10 @@ class RTCConnectionBroker {
     var configuration = {
       iceServers: [{
         urls: [
-          "stun:stun.l.google.com:19302"
+          "stun:74.125.142.127:19302"
         ]
-      }]
+      }],
+      iceCandidatePoolSize: 10
     };
     let connection = new RTCPeerConnection(configuration);
     this.connections[recipient] = connection;
