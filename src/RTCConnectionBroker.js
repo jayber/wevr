@@ -42,15 +42,13 @@ class RTCConnectionBroker {
           "stun:stun.l.google.com:19302",
           "stun:stun1.l.google.com:19302"
         ]
-      }]
+      }, {
+        urls: "turn:54.74.139.199:3478",
+        credential: "none",
+        username: "noone"
+      }],
+      iceCandidatePoolSize: 10
     };
-    /*, {
-     urls: "turn:54.74.139.199:3478",
-     credential: "none",
-     username: "noone"
-     },
-     iceCandidatePoolSize: 10
-    * */
     let connection = new RTCPeerConnection(this.configuration);
     this.connections[recipient] = connection;
 
