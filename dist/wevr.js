@@ -28289,7 +28289,8 @@ class RTCConnectionBroker {
     var configuration = {
       iceServers: [{
         urls: [
-          "stun:74.125.142.127:19302"
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302"
         ]
       }],
       iceCandidatePoolSize: 10
