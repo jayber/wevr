@@ -1,11 +1,11 @@
 import $ from "jquery";
 
-export default function log (message, server = false, console = true ) {
+export default function log (message, server = false, echo = true ) {
   if (server) {
     let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
     $.get("log", {user: name, message: message});
   }
-  if (console) {
+  if (echo) {
     console.log(message);
   }
 }

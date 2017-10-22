@@ -83,12 +83,12 @@ return /******/ (function(modules) { // webpackBootstrap
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_jquery__);
 
 
-function log (message, server = false, console = true ) {
+function log (message, server = false, echo = true ) {
   if (server) {
     let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
     __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.get("log", {user: name, message: message});
   }
-  if (console) {
+  if (echo) {
     console.log(message);
   }
 }
