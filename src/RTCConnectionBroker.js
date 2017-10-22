@@ -13,8 +13,8 @@ class RTCConnectionBroker {
         ]
       }, {
         urls: "turn:numb.viagenie.ca:3478",
-        credential: "james.a.bromley@gmail.com",
-        username: "Cp15q7ryz"
+        credential: "Cp15q7ryz",
+        username: "james.a.bromley@gmail.com"
       }],
       iceCandidatePoolSize: 0
     };
