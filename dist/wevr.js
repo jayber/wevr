@@ -28255,6 +28255,20 @@ class SignallingClient {
 class RTCConnectionBroker {
 
   constructor(signallingClient) {
+
+    this.iceConfiguration = {
+      iceServers: [{
+        urls: [
+          "stun:stun.l.google.com:19302"
+        ]
+      }, {
+        urls: "turn: ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
+        credential: "none",
+        username: "noone"
+      }],
+      iceCandidatePoolSize: 10
+    };
+
     let constraints = {audio: true, video: false};
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
     this.signallingClient = signallingClient;
@@ -28286,19 +28300,7 @@ class RTCConnectionBroker {
 
   connectTo(recipient) {
     console.log(`gonna connect to ${recipient}`);
-    this.configuration = {
-      iceServers: [{
-        urls: [
-          "stun:stun.l.google.com:19302"
-        ]
-      }, {
-        urls: "turn: ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
-        credential: "none",
-        username: "noone"
-      }],
-      iceCandidatePoolSize: 10
-    };
-    let connection = new RTCPeerConnection(this.configuration);
+    let connection = new RTCPeerConnection(this.iceConfiguration);
     this.connections[recipient] = connection;
 
     this.setUpConnection(connection, recipient).then(() => {
@@ -28358,7 +28360,7 @@ class RTCConnectionBroker {
 
   acceptOffer(data) {
     console.log(`accepting offer from ${data.from}`);
-    let connection = new RTCPeerConnection(this.configuration);
+    let connection = new RTCPeerConnection(this.iceConfiguration);
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
         this.onchannel(data.from, event.channel);
