@@ -28275,6 +28275,7 @@ class RTCConnectionBroker {
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
     this.signallingClient = signallingClient;
     this.connections = {};
+    this.candidates = {}
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });
@@ -28337,14 +28338,23 @@ class RTCConnectionBroker {
   }
 
   handleIceCandidates(connection, peer) {
+    this.candidates[peer] = [];
     connection.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.signallingClient.signal({
-          event: "wevr.ice-candidate",
-          data: {to: peer, payload: event.candidate}
-        });
-      }
+        if (event.candidate) {
+          if (this.sending) {
+          this.signalCandidate(peer, event.candidate);
+          } else {
+            this.candidates[peer].push(event.candidate);
+          }
+        }
     };
+  }
+
+  signalCandidate(peer, candidate) {
+    this.signallingClient.signal({
+      event: "wevr.ice-candidate",
+      data: {to: peer, payload: candidate}
+    });
   }
 
   addAudio(connection, peer) {
@@ -28380,6 +28390,14 @@ class RTCConnectionBroker {
     console.log(`accepting answer from ${data.from}`);
     let connection = this.connections[data.from];
     connection.setRemoteDescription(new RTCSessionDescription(data.payload));
+    this.sendCachedCandidates(data.from);
+  }
+
+  sendCachedCandidates(peer) {
+    this.candidates[peer].forEach((candidate) => {
+      this.signalCandidate(peer, candidate);
+    });
+    this.sending = true;
   }
 
   createAnswerAndSignal(connection, sender) {
@@ -28396,6 +28414,9 @@ class RTCConnectionBroker {
     console.log(`accepting ice-candidate from ${data.from}`);
     let connection = this.connections[data.from];
     connection.addIceCandidate(new RTCIceCandidate(data.payload));
+    if (!this.sending) {
+      this.sendCachedCandidates(data.from);
+    }
   }
 
   leftgame(peer) {
