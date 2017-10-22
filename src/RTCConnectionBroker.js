@@ -12,9 +12,9 @@ class RTCConnectionBroker {
           "stun:stun.l.google.com:19302"
         ]
       }, {
-        urls: "turn:numb.viagenie.ca:3478",
-        credential: "Cp15q7ryz",
-        username: "james.a.bromley@gmail.com"
+        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
+        credential: "noone",
+        username: "none"
       }],
       iceCandidatePoolSize: 0
     };
