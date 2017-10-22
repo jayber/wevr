@@ -11,15 +11,15 @@ class RTCConnectionBroker {
         urls: [
           "stun:stun.l.google.com:19302"
         ]
+      }, {
+        urls: "turn:numb.viagenie.ca:3478",
+        credential: "james.a.bromley@gmail.com",
+        username: "Cp15q7ryz"
       }],
       iceCandidatePoolSize: 0
     };
 
-/*  , {
-      urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
-        credential: "none",
-        username: "noone"
-    }*/
+/*  */
 
     let constraints = {audio: true, video: false};
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
