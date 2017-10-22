@@ -1,5 +1,5 @@
 
-import serverLog from "./Utils";
+import log from "./Utils";
 
 export default
 class DataChannels {
@@ -23,7 +23,7 @@ class DataChannels {
 
   registerChannelHandlers(channel, peer) {
     let handler = (event) => {
-      serverLog(`data channel ${peer}: ${event}`);
+      log(`data channel ${peer}: `+JSON.stringify(event), true);
     };
     channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
     channel.onclose = handler;

@@ -78,15 +78,19 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony export (immutable) */ __webpack_exports__["a"] = serverLog;
+/* harmony export (immutable) */ __webpack_exports__["a"] = log;
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_jquery__);
 
 
-function serverLog (message) {
-  let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
-  __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.get("log", {user: name, message: message});
-  console.log(message);
+function log (message, server = false, console = true ) {
+  if (server) {
+    let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
+    __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.get("log", {user: name, message: message});
+  }
+  if (console) {
+    console.log(message);
+  }
 }
 
 function errorLog (e, line) {
@@ -161,7 +165,7 @@ class DataChannels {
 
   registerChannelHandlers(channel, peer) {
     let handler = (event) => {
-      Object(__WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */])(`data channel ${peer}: ${event}`);
+      Object(__WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */])(`data channel ${peer}: `+JSON.stringify(event), true);
     };
     channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
     channel.onclose = handler;
@@ -384,7 +388,7 @@ AFRAME.registerComponent('wevr-player', {
 
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo " + peer);
+      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo " + peer, false);
 
     });
   },
@@ -458,7 +462,7 @@ AFRAME.registerComponent('wevr-player-hand', {
           position: this.position,
           quaternion: this.quaternion
         });
-        Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo hand:" + this.data + peer);
+        Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo hand:" + this.data + peer, false);
       });
 
     } else {
@@ -28313,10 +28317,10 @@ class RTCConnectionBroker {
 
   setUpConnection(connection, peer) {
     connection.oniceconnectionstatechange = () => {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`);
+      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`, true);
     };
     connection.onnegotiationneeded = () => {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} negotiation needed`);
+      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);
     return this.addAudio(connection, peer);
@@ -28426,7 +28430,7 @@ class RTCConnectionBroker {
     }
     var element = document.getElementById(peer);
     if (element) {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`removing ${peer}`);
+      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
   }

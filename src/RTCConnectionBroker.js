@@ -1,5 +1,5 @@
 import DataChannels from './DataChannels.js';
-import serverLog from "./Utils";
+import log from "./Utils";
 
 export default
 class RTCConnectionBroker {
@@ -63,10 +63,10 @@ class RTCConnectionBroker {
 
   setUpConnection(connection, peer) {
     connection.oniceconnectionstatechange = () => {
-      serverLog(`${peer} state changed to ${connection.iceConnectionState}`);
+      log(`${peer} state changed to ${connection.iceConnectionState}`, true);
     };
     connection.onnegotiationneeded = () => {
-      serverLog(`${peer} negotiation needed`);
+      log(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);
     return this.addAudio(connection, peer);
@@ -176,7 +176,7 @@ class RTCConnectionBroker {
     }
     var element = document.getElementById(peer);
     if (element) {
-      serverLog(`removing ${peer}`);
+      log(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
   }

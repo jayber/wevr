@@ -1,9 +1,13 @@
 import $ from "jquery";
 
-export default function serverLog (message) {
-  let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
-  $.get("log", {user: name, message: message});
-  console.log(message);
+export default function log (message, server = false, console = true ) {
+  if (server) {
+    let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
+    $.get("log", {user: name, message: message});
+  }
+  if (console) {
+    console.log(message);
+  }
 }
 
 function errorLog (e, line) {

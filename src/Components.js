@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import serverLog from "./Utils";
+import log from "./Utils";
 
 
 AFRAME.registerComponent('wevr-avatar', {
@@ -96,7 +96,7 @@ AFRAME.registerComponent('wevr-player', {
 
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      serverLog("sendTo " + peer);
+      log("sendTo " + peer, false);
 
     });
   },
@@ -170,7 +170,7 @@ AFRAME.registerComponent('wevr-player-hand', {
           position: this.position,
           quaternion: this.quaternion
         });
-        serverLog("sendTo hand:" + this.data + peer);
+        log("sendTo hand:" + this.data + peer, false);
       });
 
     } else {
