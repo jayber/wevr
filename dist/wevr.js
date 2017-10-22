@@ -28316,10 +28316,10 @@ class RTCConnectionBroker {
   }
 
   setUpConnection(connection, peer) {
-    connection.oniceconnectionstatechange = () => {
+    connection.oniceconnectionstatechange = (e) => {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`, true);
     };
-    connection.onnegotiationneeded = () => {
+    connection.onnegotiationneeded = (e) => {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);

@@ -62,10 +62,10 @@ class RTCConnectionBroker {
   }
 
   setUpConnection(connection, peer) {
-    connection.oniceconnectionstatechange = () => {
+    connection.oniceconnectionstatechange = (e) => {
       log(`${peer} state changed to ${connection.iceConnectionState}`, true);
     };
-    connection.onnegotiationneeded = () => {
+    connection.onnegotiationneeded = (e) => {
       log(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);
