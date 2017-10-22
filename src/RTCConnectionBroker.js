@@ -11,13 +11,15 @@ class RTCConnectionBroker {
         urls: [
           "stun:stun.l.google.com:19302"
         ]
-      }, {
-        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
+      }],
+      iceCandidatePoolSize: 0
+    };
+
+/*  , {
+      urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
         credential: "none",
         username: "noone"
-      }],
-      iceCandidatePoolSize: 10
-    };
+    }*/
 
     let constraints = {audio: true, video: false};
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
