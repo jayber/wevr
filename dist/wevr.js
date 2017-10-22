@@ -28289,11 +28289,10 @@ class RTCConnectionBroker {
     this.configuration = {
       iceServers: [{
         urls: [
-          "stun:stun.l.google.com:19302",
-          "stun:stun1.l.google.com:19302"
+          "stun:stun.l.google.com:19302"
         ]
       }, {
-        urls: "turn:54.74.139.199:3478",
+        urls: "turn: ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
         credential: "none",
         username: "noone"
       }],
