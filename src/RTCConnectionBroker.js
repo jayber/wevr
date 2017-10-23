@@ -67,6 +67,12 @@ class RTCConnectionBroker {
   setUpConnection(connection, peer) {
     connection.oniceconnectionstatechange = (e) => {
       log(`${peer} state changed to ${connection.iceConnectionState}`, true);
+      if (connection.iceConnectionState == failed) {
+        this.signaller.signal({
+          event: "wevr.peer-ping-failure",
+          data: [peer]
+        })
+      }
     };
     connection.onnegotiationneeded = (e) => {
       log(`${peer} negotiation needed`, true);

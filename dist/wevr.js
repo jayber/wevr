@@ -28360,6 +28360,12 @@ class RTCConnectionBroker {
   setUpConnection(connection, peer) {
     connection.oniceconnectionstatechange = (e) => {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`, true);
+      if (connection.iceConnectionState == failed) {
+        this.signaller.signal({
+          event: "wevr.peer-ping-failure",
+          data: [peer]
+        })
+      }
     };
     connection.onnegotiationneeded = (e) => {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} negotiation needed`, true);
