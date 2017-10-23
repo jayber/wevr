@@ -28074,12 +28074,16 @@ AFRAME.registerSystem('wevr', {
       })
     });
     this.channels.broadcast("wevr.peer-ping",{});
-    setTimeout(()=>{
-        this.signaller.signal( {
-          event: "wevr.peer-ping-failure",
-        data: __WEBPACK_IMPORTED_MODULE_7_lodash__["difference"](self.pingRecpients,self.pingReplies)})
+    setTimeout(()=> {
+        if (self.pingRecpients.length != self.pingReplies.length) {
+          this.signaller.signal({
+            event: "wevr.peer-ping-failure",
+            data: __WEBPACK_IMPORTED_MODULE_7_lodash__["difference"](self.pingRecpients, self.pingReplies)
+          })
+        }
       }
       , 30000);
+
   },
 
   setUpPlayer(sceneEl) {
@@ -28360,7 +28364,7 @@ class RTCConnectionBroker {
   setUpConnection(connection, peer) {
     connection.oniceconnectionstatechange = (e) => {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`, true);
-      if (connection.iceConnectionState == failed) {
+      if (connection.iceConnectionState == 'failed') {
         this.signaller.signal({
           event: "wevr.peer-ping-failure",
           data: [peer]

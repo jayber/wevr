@@ -63,12 +63,16 @@ AFRAME.registerSystem('wevr', {
       })
     });
     this.channels.broadcast("wevr.peer-ping",{});
-    setTimeout(()=>{
-        this.signaller.signal( {
-          event: "wevr.peer-ping-failure",
-        data: _.difference(self.pingRecpients,self.pingReplies)})
+    setTimeout(()=> {
+        if (self.pingRecpients.length != self.pingReplies.length) {
+          this.signaller.signal({
+            event: "wevr.peer-ping-failure",
+            data: _.difference(self.pingRecpients, self.pingReplies)
+          })
+        }
       }
       , 30000);
+
   },
 
   setUpPlayer(sceneEl) {
