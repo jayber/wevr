@@ -1,6 +1,6 @@
 export default class SignallingClient {
 
-  constructor(host = "wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
+  constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
     this.host = host;
     this.roomId = roomId;
     this.secondsTilRetry = 2;
@@ -9,13 +9,19 @@ export default class SignallingClient {
 
   start() {
     if (this.ws) {
-      this.ws.close();
+      this.close();
     }
     this.ws = this.connect(this.host, this.roomId);
   }
 
+  close() {
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
   connect(host, roomId) {
-    let ws = new WebSocket(`wss://${host}/${roomId}`);
+    let ws = new WebSocket(`${host}/${roomId}`);
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;

@@ -5,12 +5,13 @@ import DataChannels from "./DataChannels.js";
 import PositionalAudio from "./PositionalAudio.js";
 import {detect} from 'detect-browser';
 import * as THREE from 'three';
+import * as _ from 'lodash';
 
 
 AFRAME.registerSystem('wevr', {
   schema: {
     period: {default: 100},
-    signalUrl: {default: 'wevr.vrlobby.co/wevr'},
+    signalUrl: {default: 'wss://wevr.vrlobby.co/wevr'},
     startOnLoad: {default: false}
   },
 
@@ -31,6 +32,8 @@ AFRAME.registerSystem('wevr', {
 
     this.setUpAvatars(this.channels, this.el.sceneEl);
 
+    this.setUpPeerConnectionChecks(broker, this.channels);
+
     if (this.el.hasLoaded) {
       this.signaller.start();
     } else {
@@ -38,6 +41,34 @@ AFRAME.registerSystem('wevr', {
         this.signaller.start();
       });
     }
+  },
+
+  setUpPeerConnectionChecks(broker, channels) {
+    broker.oncheckconnections = (peers) => {this.checkConnections(peers)};
+    channels.addEventListener("wevr.peer-ping", (param, peer) => {
+      if (window.wevr.id!="$b") this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
+    });
+    broker.onreconnect = () => {
+      location.reload();
+    }
+  },
+
+  checkConnections(peers) {
+    this.pingReplies = [];
+    this.pingRecpients = peers;
+    var self = this;
+    peers.forEach((peer) => {
+      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
+        self.pingReplies.push(peer);
+      })
+    });
+    this.channels.broadcast("wevr.peer-ping",{});
+    setTimeout(()=>{
+        this.signaller.signal( {
+          event: "wevr.peer-ping-failure",
+        data: _.difference(self.pingRecpients,self.pingReplies)})
+      }
+      , 30000);
   },
 
   setUpPlayer(sceneEl) {

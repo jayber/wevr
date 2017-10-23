@@ -70,7 +70,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 2);
+/******/ 	return __webpack_require__(__webpack_require__.s = 3);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -137,458 +137,6 @@ window.addEventListener('error', function (e, url, line) {
 
 /***/ }),
 /* 1 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(0);
-
-
-
-class DataChannels {
-
-  constructor(broker) {
-    this.channels = {};
-    this.listeners = {};
-    this.peerListeners = {};
-    this.ready = {};
-    broker.onchannel = (peer, dataChannel) => {
-      this.addChannel(peer, dataChannel);
-    };
-  }
-
-  addChannel(peer, dataChannel) {
-    this.channels[peer] = dataChannel;
-    this.registerChannelHandlers(dataChannel, peer);
-    this.dispatch({event: "open"},peer);
-    dataChannel.send(JSON.stringify({event: "ready"}));
-  }
-
-  registerChannelHandlers(channel, peer) {
-    let handler = (event) => {
-      Object(__WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */])(`data channel ${peer}: `+JSON.stringify(event), true);
-    };
-    channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
-    channel.onclose = handler;
-    channel.onerror = handler;
-  }
-
-  messageHandler(event, peer) {
-    var msg = JSON.parse(event.data);
-    console.log(peer+" data channel received: " + event.data);
-    if (msg.event === "ready"){
-      this.ready[peer] = true;
-    }
-    this.dispatch(msg, peer);
-  }
-
-  addEventListenerForPeer(peer, type, listener) {
-    if (!(peer in this.peerListeners)) {
-      this.peerListeners[peer] = {};
-    }
-    if (!(type in this.peerListeners[peer])) {
-      this.peerListeners[peer][type] = [];
-    }
-    this.peerListeners[peer][type].push(listener);
-    if (type === "ready" && this.ready[peer]) {
-      this.dispatch({event: "ready"}, peer);
-    }
-  }
-
-  addEventListener(type, listener) {
-    if (!(type in this.listeners)) {
-      this.listeners[type] = [];
-    }
-    this.listeners[type].push(listener);
-    if (type === "ready") {
-      Object.keys(this.ready).forEach((key)=>{
-        this.dispatch({event: "ready"}, key);
-    });
-    }
-  }
-
-  sendTo(peer, event, data) {
-      let channel = this.channels[peer];
-      if (channel.readyState === "open") {
-        channel.send(JSON.stringify({event, data}));
-      } else {
-        channel.onopen = () => {
-          channel.send(JSON.stringify({event, data}));
-        }
-      }
-  }
-
-  broadcast(event, data) {
-    Object.keys(this.channels).forEach((peer) => {
-      let channel = this.channels[peer];
-      if (channel.readyState === "open") {
-        channel.send(JSON.stringify({event, data}));
-      } else {
-        channel.onopen = () => {
-          channel.send(JSON.stringify({event, data}));
-        }
-      }
-    });
-  }
-
-  dispatch(msg, peer) {
-    var type = msg.event;
-    var param = msg.data;
-    if (type in this.listeners) {
-      var stack = this.listeners[type];
-      stack.forEach((element) => {
-        element.call(this, param, peer);
-      });
-    }
-
-    if (peer in this.peerListeners && type in this.peerListeners[peer]) {
-      stack = this.peerListeners[peer][type];
-      stack.forEach((element) => {
-        element.call(this, param, peer);
-      });
-    }
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = DataChannels;
-
-
-/***/ }),
-/* 2 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__index_js__ = __webpack_require__(3);
-AFRAME.registerSystem('wevr-auto-start', {
-  init() {
-    var wevr = this.el.systems.wevr;
-    wevr.data.startOnLoad = true;
-    wevr.start();
-  }
-});
-
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Components_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__WevrSystem_js__ = __webpack_require__(9);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_aframe_joysticks_movement_component__ = __webpack_require__(18);
-
-
-
-
-
-
-/***/ }),
-/* 4 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_lodash__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(0);
-
-
-
-
-AFRAME.registerComponent('wevr-avatar', {
-  schema: {type: "string"},
-  init() {
-    this.el.innerHTML = `<a-sphere class="head"
-                          color="#5985ff"
-                          position="0 -0.05 0"
-                          scale="0.25 0.3 0.2">
-
-<a-entity class="face"
-                          position="0 0 -0.6">
-                        <a-sphere position="0 0.05 -0.4"
-                          color="#5985ff"
-                          scale="0.18 0.18 0.18">
-                </a-sphere>
-                    <a-sphere class="eye"
-                              color="#efefef"
-                              position="0.3 0.35 -0.3"
-                              scale="0.15 0.15 0.15"
-                            >
-                        <a-sphere class="pupil"
-                                  color="#000"
-                                  position="0 0 -1"
-                                  scale="0.45 0.45 0.45"
-                                ></a-sphere>
-                    </a-sphere>
-                    <a-sphere class="eye"
-                              color="#efefef"
-                              position="-0.3 0.35 -0.3"
-                              scale="0.15 0.15 0.15"
-                            >
-                        <a-sphere class="pupil"
-                                  color="#000"
-                                  position="0 0 -1"
-                                  scale="0.45 0.45 0.45"
-                                ></a-sphere>
-                    </a-sphere>
-                </a-entity>
-
-                </a-sphere>
-                `;
-    this.system = this.el.sceneEl.systems.wevr;
-
-    var channels = this.system.channels;
-    channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
-      this.system.updateMovement(this.el, event, this);
-
-    })
-  },
-
-  tick(time, timeDelta) {
-    this.system.makeMovementChanges(this);
-    this.system.positionalAudio.makeAudioPositionChanges(this.data, this.targetPosition);
-  }
-});
-
-AFRAME.registerComponent('wevr-avatar-hand', {
-  schema: {
-    peer: {type: "string"},
-    hand: {type: "string"}
-  },
-  init() {
-    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
-
-    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 -0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    </a-sphere>`;
-
-    this.system = this.el.sceneEl.systems.wevr;
-    var channels = this.system.channels;
-
-    channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
-      this.system.updateMovement(this.el, event, this);
-    });
-  },
-
-  tick(time, timeDelta) {
-    this.system.makeMovementChanges(this);
-  }
-});
-
-AFRAME.registerComponent('wevr-player', {
-  init() {
-    this.system = this.el.sceneEl.systems.wevr;
-
-    this.setPosition(this.el.parentNode);
-    this.el.object3D.updateMatrixWorld();
-    this.position = this.el.object3D.getWorldPosition();
-    this.quaternion = this.el.object3D.getWorldQuaternion();
-    this.period = this.system.data.period;
-
-    this.system.channels.addEventListener("ready", (data, peer) => {
-      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo " + peer, false);
-
-    });
-  },
-
-  setPosition(el) {
-    var center = {x: 0, y: 0, z: 0};
-    let radius = 3;
-
-    var angleRad = this.getRandomAngleInRadians();
-    var circlePoint = this.randomPointOnCircle(radius, angleRad);
-    var worldPoint = {x: circlePoint.x + center.x, y: center.y, z: circlePoint.y + center.z};
-    el.setAttribute('position', worldPoint);
-
-    var angleDeg = angleRad * 180 / Math.PI;
-    var angleToCenter = -1 * angleDeg + 90;
-    var rotationStr = '0 ' + angleToCenter + ' 0';
-    el.setAttribute('rotation', rotationStr);
-  },
-
-  tick(time, delta) {
-    if (!this.lastSent || time - this.lastSent > this.period) {
-      this.el.object3D.updateMatrixWorld(true);
-      var position = this.el.object3D.getWorldPosition();
-      var quaternion = this.el.object3D.getWorldQuaternion();
-
-      if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
-        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
-        this.position = position;
-        this.quaternion = quaternion;
-        this.system.positionalAudio.updateListener(this.el.object3D.matrixWorld);
-      }
-      this.lastSent = time;
-    }
-  },
-
-  getRandomAngleInRadians: function () {
-    return Math.random() * Math.PI * 2;
-  },
-
-  randomPointOnCircle: function (radius, angleRad) {
-    let x = Math.cos(angleRad) * radius;
-    let y = Math.sin(angleRad) * radius;
-    return {x: x, y: y};
-  }
-});
-
-
-AFRAME.registerComponent('wevr-player-hand', {
-  schema: {type: "string"},
-  init() {
-    this.system = this.el.sceneEl.systems.wevr;
-
-    this.initializeHands();
-    window.addEventListener("gamepadconnected", () => {
-      this.initializeHands()
-    });
-  },
-
-  initializeHands() {
-    this.hasHand = this.checkHand(this.data);
-    if (this.hasHand) {
-      this.el.setAttribute("visible", "true");
-      this.el.object3D.updateMatrixWorld();
-      this.position = this.el.object3D.getWorldPosition();
-      this.quaternion = this.el.object3D.getWorldQuaternion();
-      this.period = this.system.data.period;
-
-      this.system.channels.addEventListener("ready", (data, peer) => {
-        this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
-          hand: this.data,
-          position: this.position,
-          quaternion: this.quaternion
-        });
-        Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo hand:" + this.data + peer, false);
-      });
-
-    } else {
-      this.el.setAttribute("visible", "false");
-    }
-  },
-
-  checkHand(hand) {
-    var gamepads = navigator.getGamepads && navigator.getGamepads();
-    var i = 0;
-    if (gamepads) {
-      for (; i < gamepads.length; i++) {
-        var gamepad = gamepads[i];
-        if (gamepad) {
-          if (gamepad.id.toLowerCase().indexOf(hand) != -1) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  },
-
-  tick(time, delta) {
-    if (this.hasHand) {
-      if (!this.lastSent || time - this.lastSent > this.period) {
-        this.el.object3D.updateMatrixWorld(true);
-        var position = this.el.object3D.getWorldPosition();
-        var quaternion = this.el.object3D.getWorldQuaternion();
-
-        if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
-          this.system.channels.broadcast("wevr.movement.hands." + this.data, {
-            position: position,
-            quaternion: quaternion
-          });
-          this.position = position;
-          this.quaternion = quaternion;
-        }
-        this.lastSent = time;
-      }
-    }
-  }
-});
-
-
-AFRAME.registerComponent('maybe-cursor', {
-  init() {
-    if (!this.el.sceneEl.is('vr-mode')) {
-      this.addCursor();
-    } else {
-      this.removeCursor();
-    }
-    this.el.sceneEl.addEventListener('enter-vr', () => this.removeCursor());
-    this.el.sceneEl.addEventListener('exit-vr', () => this.addCursor());
-  },
-
-  removeCursor() {
-    this.el.removeAttribute("cursor");
-    this.el.setAttribute("visible", "false");
-  },
-
-  addCursor() {
-    this.el.setAttribute("cursor", "");
-    this.el.setAttribute("visible", "true");
-  }
-});
-
-
-AFRAME.registerComponent('refresh-button', {
-
-  types: {GAMEPAD: 'gamepad', OCULUS: 'oculus-touch', VIVE: 'vive'},
-
-  tick: function () {
-    if (!this.button) {
-      var gamepad = this.getGamepad();
-      if (gamepad) {
-        this.button = gamepad.buttons[0].pressed;
-        if (this.button) {
-          setTimeout(() => {
-            if (this.getGamepad().buttons[0].pressed) {
-              location.reload();
-            }
-            this.button = undefined;
-          }, 1000);
-        }
-      }
-    }
-  },
-
-  checkControllerType: function () {
-    var typeFound = this.types.GAMEPAD;
-    var indexFound = 0;
-    var gamepads = navigator.getGamepads && navigator.getGamepads();
-    var i = 0;
-    if (gamepads) {
-      for (; i < gamepads.length; i++) {
-        var gamepad = gamepads[i];
-        if (gamepad) {
-          if (gamepad.id.indexOf('Oculus Touch') === 0) {
-            typeFound = this.types.OCULUS;
-            indexFound = i;
-            break;
-          }
-          if (gamepad.id.indexOf('OpenVR Gamepad') === 0) {
-            typeFound = this.types.VIVE;
-            indexFound = i;
-            break;
-          }
-          indexFound = i;
-        }
-      }
-      return {index: indexFound, type: typeFound};
-    }
-    return false;
-  },
-
-  getGamepad: function () {
-    var type = this.checkControllerType();
-    return type
-      && navigator.getGamepads()[type.index];
-  }
-});
-
-
-/***/ }),
-/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global, module) {var __WEBPACK_AMD_DEFINE_RESULT__;/**
@@ -17680,6 +17228,458 @@ AFRAME.registerComponent('refresh-button', {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6), __webpack_require__(7)(module)))
 
 /***/ }),
+/* 2 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(0);
+
+
+
+class DataChannels {
+
+  constructor(broker) {
+    this.channels = {};
+    this.listeners = {};
+    this.peerListeners = {};
+    this.ready = {};
+    broker.onchannel = (peer, dataChannel) => {
+      this.addChannel(peer, dataChannel);
+    };
+  }
+
+  addChannel(peer, dataChannel) {
+    this.channels[peer] = dataChannel;
+    this.registerChannelHandlers(dataChannel, peer);
+    this.dispatch({event: "open"},peer);
+    dataChannel.send(JSON.stringify({event: "ready"}));
+  }
+
+  registerChannelHandlers(channel, peer) {
+    let handler = (event) => {
+      Object(__WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */])(`data channel ${peer}: `+JSON.stringify(event), true);
+    };
+    channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
+    channel.onclose = handler;
+    channel.onerror = handler;
+  }
+
+  messageHandler(event, peer) {
+    var msg = JSON.parse(event.data);
+    console.log(peer+" data channel received: " + event.data);
+    if (msg.event === "ready"){
+      this.ready[peer] = true;
+    }
+    this.dispatch(msg, peer);
+  }
+
+  addEventListenerForPeer(peer, type, listener) {
+    if (!(peer in this.peerListeners)) {
+      this.peerListeners[peer] = {};
+    }
+    if (!(type in this.peerListeners[peer])) {
+      this.peerListeners[peer][type] = [];
+    }
+    this.peerListeners[peer][type].push(listener);
+    if (type === "ready" && this.ready[peer]) {
+      this.dispatch({event: "ready"}, peer);
+    }
+  }
+
+  addEventListener(type, listener) {
+    if (!(type in this.listeners)) {
+      this.listeners[type] = [];
+    }
+    this.listeners[type].push(listener);
+    if (type === "ready") {
+      Object.keys(this.ready).forEach((key)=>{
+        this.dispatch({event: "ready"}, key);
+    });
+    }
+  }
+
+  sendTo(peer, event, data) {
+      let channel = this.channels[peer];
+      if (channel.readyState === "open") {
+        channel.send(JSON.stringify({event, data}));
+      } else {
+        channel.onopen = () => {
+          channel.send(JSON.stringify({event, data}));
+        }
+      }
+  }
+
+  broadcast(event, data) {
+    Object.keys(this.channels).forEach((peer) => {
+      let channel = this.channels[peer];
+      if (channel.readyState === "open") {
+        channel.send(JSON.stringify({event, data}));
+      } else {
+        channel.onopen = () => {
+          channel.send(JSON.stringify({event, data}));
+        }
+      }
+    });
+  }
+
+  dispatch(msg, peer) {
+    var type = msg.event;
+    var param = msg.data;
+    if (type in this.listeners) {
+      var stack = this.listeners[type];
+      stack.forEach((element) => {
+        element(param, peer);
+      });
+    }
+
+    if (peer in this.peerListeners && type in this.peerListeners[peer]) {
+      stack = this.peerListeners[peer][type];
+      stack.forEach((element) => {
+        element(param, peer);
+      });
+    }
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = DataChannels;
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__index_js__ = __webpack_require__(4);
+AFRAME.registerSystem('wevr-auto-start', {
+  init() {
+    var wevr = this.el.systems.wevr;
+    wevr.data.startOnLoad = true;
+    wevr.start();
+  }
+});
+
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Components_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__WevrSystem_js__ = __webpack_require__(9);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_aframe_joysticks_movement_component__ = __webpack_require__(18);
+
+
+
+
+
+
+/***/ }),
+/* 5 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_lodash__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(0);
+
+
+
+
+AFRAME.registerComponent('wevr-avatar', {
+  schema: {type: "string"},
+  init() {
+    this.el.innerHTML = `<a-sphere class="head"
+                          color="#5985ff"
+                          position="0 -0.05 0"
+                          scale="0.25 0.3 0.2">
+
+<a-entity class="face"
+                          position="0 0 -0.6">
+                        <a-sphere position="0 0.05 -0.4"
+                          color="#5985ff"
+                          scale="0.18 0.18 0.18">
+                </a-sphere>
+                    <a-sphere class="eye"
+                              color="#efefef"
+                              position="0.3 0.35 -0.3"
+                              scale="0.15 0.15 0.15"
+                            >
+                        <a-sphere class="pupil"
+                                  color="#000"
+                                  position="0 0 -1"
+                                  scale="0.45 0.45 0.45"
+                                ></a-sphere>
+                    </a-sphere>
+                    <a-sphere class="eye"
+                              color="#efefef"
+                              position="-0.3 0.35 -0.3"
+                              scale="0.15 0.15 0.15"
+                            >
+                        <a-sphere class="pupil"
+                                  color="#000"
+                                  position="0 0 -1"
+                                  scale="0.45 0.45 0.45"
+                                ></a-sphere>
+                    </a-sphere>
+                </a-entity>
+
+                </a-sphere>
+                `;
+    this.system = this.el.sceneEl.systems.wevr;
+
+    var channels = this.system.channels;
+    channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
+      this.system.updateMovement(this.el, event, this);
+
+    })
+  },
+
+  tick(time, timeDelta) {
+    this.system.makeMovementChanges(this);
+    this.system.positionalAudio.makeAudioPositionChanges(this.data, this.targetPosition);
+  }
+});
+
+AFRAME.registerComponent('wevr-avatar-hand', {
+  schema: {
+    peer: {type: "string"},
+    hand: {type: "string"}
+  },
+  init() {
+    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
+
+    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 -0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    </a-sphere>`;
+
+    this.system = this.el.sceneEl.systems.wevr;
+    var channels = this.system.channels;
+
+    channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
+      this.system.updateMovement(this.el, event, this);
+    });
+  },
+
+  tick(time, timeDelta) {
+    this.system.makeMovementChanges(this);
+  }
+});
+
+AFRAME.registerComponent('wevr-player', {
+  init() {
+    this.system = this.el.sceneEl.systems.wevr;
+
+    this.setPosition(this.el.parentNode);
+    this.el.object3D.updateMatrixWorld();
+    this.position = this.el.object3D.getWorldPosition();
+    this.quaternion = this.el.object3D.getWorldQuaternion();
+    this.period = this.system.data.period;
+
+    this.system.channels.addEventListener("ready", (data, peer) => {
+      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
+      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo " + peer, false);
+
+    });
+  },
+
+  setPosition(el) {
+    var center = {x: 0, y: 0, z: 0};
+    let radius = 3;
+
+    var angleRad = this.getRandomAngleInRadians();
+    var circlePoint = this.randomPointOnCircle(radius, angleRad);
+    var worldPoint = {x: circlePoint.x + center.x, y: center.y, z: circlePoint.y + center.z};
+    el.setAttribute('position', worldPoint);
+
+    var angleDeg = angleRad * 180 / Math.PI;
+    var angleToCenter = -1 * angleDeg + 90;
+    var rotationStr = '0 ' + angleToCenter + ' 0';
+    el.setAttribute('rotation', rotationStr);
+  },
+
+  tick(time, delta) {
+    if (!this.lastSent || time - this.lastSent > this.period) {
+      this.el.object3D.updateMatrixWorld(true);
+      var position = this.el.object3D.getWorldPosition();
+      var quaternion = this.el.object3D.getWorldQuaternion();
+
+      if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
+        this.position = position;
+        this.quaternion = quaternion;
+        this.system.positionalAudio.updateListener(this.el.object3D.matrixWorld);
+      }
+      this.lastSent = time;
+    }
+  },
+
+  getRandomAngleInRadians: function () {
+    return Math.random() * Math.PI * 2;
+  },
+
+  randomPointOnCircle: function (radius, angleRad) {
+    let x = Math.cos(angleRad) * radius;
+    let y = Math.sin(angleRad) * radius;
+    return {x: x, y: y};
+  }
+});
+
+
+AFRAME.registerComponent('wevr-player-hand', {
+  schema: {type: "string"},
+  init() {
+    this.system = this.el.sceneEl.systems.wevr;
+
+    this.initializeHands();
+    window.addEventListener("gamepadconnected", () => {
+      this.initializeHands()
+    });
+  },
+
+  initializeHands() {
+    this.hasHand = this.checkHand(this.data);
+    if (this.hasHand) {
+      this.el.setAttribute("visible", "true");
+      this.el.object3D.updateMatrixWorld();
+      this.position = this.el.object3D.getWorldPosition();
+      this.quaternion = this.el.object3D.getWorldQuaternion();
+      this.period = this.system.data.period;
+
+      this.system.channels.addEventListener("ready", (data, peer) => {
+        this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
+          hand: this.data,
+          position: this.position,
+          quaternion: this.quaternion
+        });
+        Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo hand:" + this.data + peer, false);
+      });
+
+    } else {
+      this.el.setAttribute("visible", "false");
+    }
+  },
+
+  checkHand(hand) {
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.toLowerCase().indexOf(hand) != -1) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  },
+
+  tick(time, delta) {
+    if (this.hasHand) {
+      if (!this.lastSent || time - this.lastSent > this.period) {
+        this.el.object3D.updateMatrixWorld(true);
+        var position = this.el.object3D.getWorldPosition();
+        var quaternion = this.el.object3D.getWorldQuaternion();
+
+        if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+          this.system.channels.broadcast("wevr.movement.hands." + this.data, {
+            position: position,
+            quaternion: quaternion
+          });
+          this.position = position;
+          this.quaternion = quaternion;
+        }
+        this.lastSent = time;
+      }
+    }
+  }
+});
+
+
+AFRAME.registerComponent('maybe-cursor', {
+  init() {
+    if (!this.el.sceneEl.is('vr-mode')) {
+      this.addCursor();
+    } else {
+      this.removeCursor();
+    }
+    this.el.sceneEl.addEventListener('enter-vr', () => this.removeCursor());
+    this.el.sceneEl.addEventListener('exit-vr', () => this.addCursor());
+  },
+
+  removeCursor() {
+    this.el.removeAttribute("cursor");
+    this.el.setAttribute("visible", "false");
+  },
+
+  addCursor() {
+    this.el.setAttribute("cursor", "");
+    this.el.setAttribute("visible", "true");
+  }
+});
+
+
+AFRAME.registerComponent('refresh-button', {
+
+  types: {GAMEPAD: 'gamepad', OCULUS: 'oculus-touch', VIVE: 'vive'},
+
+  tick: function () {
+    if (!this.button) {
+      var gamepad = this.getGamepad();
+      if (gamepad) {
+        this.button = gamepad.buttons[0].pressed;
+        if (this.button) {
+          setTimeout(() => {
+            if (this.getGamepad().buttons[0].pressed) {
+              location.reload();
+            }
+            this.button = undefined;
+          }, 1000);
+        }
+      }
+    }
+  },
+
+  checkControllerType: function () {
+    var typeFound = this.types.GAMEPAD;
+    var indexFound = 0;
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.indexOf('Oculus Touch') === 0) {
+            typeFound = this.types.OCULUS;
+            indexFound = i;
+            break;
+          }
+          if (gamepad.id.indexOf('OpenVR Gamepad') === 0) {
+            typeFound = this.types.VIVE;
+            indexFound = i;
+            break;
+          }
+          indexFound = i;
+        }
+      }
+      return {index: indexFound, type: typeFound};
+    }
+    return false;
+  },
+
+  getGamepad: function () {
+    var type = this.checkControllerType();
+    return type
+      && navigator.getGamepads()[type.index];
+  }
+});
+
+
+/***/ }),
 /* 6 */
 /***/ (function(module, exports) {
 
@@ -28002,11 +28002,14 @@ return jQuery;
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__ = __webpack_require__(11);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__ = __webpack_require__(13);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser__ = __webpack_require__(14);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_detect_browser__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_three__ = __webpack_require__(17);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_lodash__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7_lodash__);
+
 
 
 
@@ -28019,7 +28022,7 @@ return jQuery;
 AFRAME.registerSystem('wevr', {
   schema: {
     period: {default: 100},
-    signalUrl: {default: 'wevr.vrlobby.co/wevr'},
+    signalUrl: {default: 'wss://wevr.vrlobby.co/wevr'},
     startOnLoad: {default: false}
   },
 
@@ -28040,6 +28043,8 @@ AFRAME.registerSystem('wevr', {
 
     this.setUpAvatars(this.channels, this.el.sceneEl);
 
+    this.setUpPeerConnectionChecks(broker, this.channels);
+
     if (this.el.hasLoaded) {
       this.signaller.start();
     } else {
@@ -28047,6 +28052,34 @@ AFRAME.registerSystem('wevr', {
         this.signaller.start();
       });
     }
+  },
+
+  setUpPeerConnectionChecks(broker, channels) {
+    broker.oncheckconnections = (peers) => {this.checkConnections(peers)};
+    channels.addEventListener("wevr.peer-ping", (param, peer) => {
+      if (window.wevr.id!="$b") this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
+    });
+    broker.onreconnect = () => {
+      location.reload();
+    }
+  },
+
+  checkConnections(peers) {
+    this.pingReplies = [];
+    this.pingRecpients = peers;
+    var self = this;
+    peers.forEach((peer) => {
+      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
+        self.pingReplies.push(peer);
+      })
+    });
+    this.channels.broadcast("wevr.peer-ping",{});
+    setTimeout(()=>{
+        this.signaller.signal( {
+          event: "wevr.peer-ping-failure",
+        data: __WEBPACK_IMPORTED_MODULE_7_lodash__["difference"](self.pingRecpients,self.pingReplies)})
+      }
+      , 30000);
   },
 
   setUpPlayer(sceneEl) {
@@ -28163,7 +28196,7 @@ AFRAME.registerSystem('wevr', {
 "use strict";
 class SignallingClient {
 
-  constructor(host = "wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
+  constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
     this.host = host;
     this.roomId = roomId;
     this.secondsTilRetry = 2;
@@ -28172,13 +28205,19 @@ class SignallingClient {
 
   start() {
     if (this.ws) {
-      this.ws.close();
+      this.close();
     }
     this.ws = this.connect(this.host, this.roomId);
   }
 
+  close() {
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
   connect(host, roomId) {
-    let ws = new WebSocket(`wss://${host}/${roomId}`);
+    let ws = new WebSocket(`${host}/${roomId}`);
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
@@ -28251,7 +28290,7 @@ class SignallingClient {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__DataChannels_js__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__DataChannels_js__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(0);
 
 
@@ -28269,11 +28308,8 @@ class RTCConnectionBroker {
         urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
         credential: "noone",
         username: "none"
-      }],
-      iceCandidatePoolSize: 0
+      }]
     };
-
-/*  */
 
     let constraints = {audio: true, video: false};
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
@@ -28294,6 +28330,12 @@ class RTCConnectionBroker {
     });
     this.listen("wevr.leftgame", (data) => {
       this.leftgame(data);
+    });
+    this.listen("wevr.check-connections", (data) => {
+      this.checkConnections(data);
+    });
+    this.listen("wevr.reconnect", () => {
+      this.reconnect();
     });
     this.listen("wevr.id", (data) => {
       console.log(`I am ${data}`);
@@ -28433,6 +28475,14 @@ class RTCConnectionBroker {
       Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
+  }
+
+  checkConnections(peers) {
+    this.oncheckconnections(peers);
+  }
+
+  reconnect() {
+    this.onreconnect();
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = RTCConnectionBroker;

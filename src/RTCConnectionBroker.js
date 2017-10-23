@@ -15,11 +15,8 @@ class RTCConnectionBroker {
         urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
         credential: "noone",
         username: "none"
-      }],
-      iceCandidatePoolSize: 0
+      }]
     };
-
-/*  */
 
     let constraints = {audio: true, video: false};
     this.audio = navigator.mediaDevices.getUserMedia(constraints);
@@ -40,6 +37,12 @@ class RTCConnectionBroker {
     });
     this.listen("wevr.leftgame", (data) => {
       this.leftgame(data);
+    });
+    this.listen("wevr.check-connections", (data) => {
+      this.checkConnections(data);
+    });
+    this.listen("wevr.reconnect", () => {
+      this.reconnect();
     });
     this.listen("wevr.id", (data) => {
       console.log(`I am ${data}`);
@@ -179,5 +182,13 @@ class RTCConnectionBroker {
       log(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
+  }
+
+  checkConnections(peers) {
+    this.oncheckconnections(peers);
+  }
+
+  reconnect() {
+    this.onreconnect();
   }
 }

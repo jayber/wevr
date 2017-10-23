@@ -94,14 +94,14 @@ class DataChannels {
     if (type in this.listeners) {
       var stack = this.listeners[type];
       stack.forEach((element) => {
-        element.call(this, param, peer);
+        element(param, peer);
       });
     }
 
     if (peer in this.peerListeners && type in this.peerListeners[peer]) {
       stack = this.peerListeners[peer][type];
       stack.forEach((element) => {
-        element.call(this, param, peer);
+        element(param, peer);
       });
     }
   }
