@@ -19,7 +19,16 @@ class RTCConnectionBroker {
     };
 
     let constraints = {audio: true, video: false};
-    this.audio = navigator.mediaDevices.getUserMedia(constraints);
+    var self = this;
+    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
+      self.audioState = 'success';
+      self.onaudio();
+      return audio;
+    }).catch(() => {
+      self.audioState = 'mute';
+      self.onaudio();
+    });
+    this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
     this.candidates = {}
@@ -118,7 +127,7 @@ class RTCConnectionBroker {
 
   addAudio(connection, peer) {
     connection.ontrack = (e) => {
-      this.onaudio(e.streams[0], peer);
+      this.onpeeraudio(e.streams[0], peer);
     };
     return this.audio.then((stream) => {
       stream.getTracks().forEach(track => {

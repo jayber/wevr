@@ -65,10 +65,10 @@ AFRAME.registerComponent('wevr-avatar-hand', {
   init() {
     var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
 
-    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 -0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#5985ff" radius="0.1"></a-sphere>
     </a-sphere>`;
 
     this.system = this.el.sceneEl.systems.wevr;

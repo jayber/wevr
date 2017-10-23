@@ -17449,10 +17449,10 @@ AFRAME.registerComponent('wevr-avatar-hand', {
   init() {
     var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
 
-    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 -0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#5985ff" radius="0.1"></a-sphere>
     </a-sphere>`;
 
     this.system = this.el.sceneEl.systems.wevr;
@@ -28097,6 +28097,7 @@ AFRAME.registerSystem('wevr', {
             position="0 0 -1"
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: darkgrey; shader: flat"></a-entity>
+    <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
     </a-entity>
     <a-entity wevr-player-hand="right" laser-controls="hand:right" hand-controls="right" ></a-entity>
     <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
@@ -28104,7 +28105,17 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpAudio(broker, sceneEl) {
-    broker.onaudio = (stream, peer) => {
+    broker.onaudio = () => {
+      var el = document.getElementById("audioinfo");
+      if (el) {
+        if (broker.audioState == "success") {
+          el.setAttribute("visible", "false");
+        } else {
+          el.setAttribute("text","value",broker.audioState)
+        }
+      }
+    };
+    broker.onpeeraudio = (stream, peer) => {
       const browser = Object(__WEBPACK_IMPORTED_MODULE_5_detect_browser__["detect"])();
       switch (browser && browser.name) {
         case 'chrome':
@@ -28316,7 +28327,16 @@ class RTCConnectionBroker {
     };
 
     let constraints = {audio: true, video: false};
-    this.audio = navigator.mediaDevices.getUserMedia(constraints);
+    var self = this;
+    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
+      self.audioState = 'success';
+      self.onaudio();
+      return audio;
+    }).catch(() => {
+      self.audioState = 'mute';
+      self.onaudio();
+    });
+    this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
     this.candidates = {}
@@ -28415,7 +28435,7 @@ class RTCConnectionBroker {
 
   addAudio(connection, peer) {
     connection.ontrack = (e) => {
-      this.onaudio(e.streams[0], peer);
+      this.onpeeraudio(e.streams[0], peer);
     };
     return this.audio.then((stream) => {
       stream.getTracks().forEach(track => {
@@ -73328,7 +73348,7 @@ AFRAME.registerComponent('joysticks-movement', {
       // Rotation
       this.pitch = new THREE.Object3D();
       this.yaw = new THREE.Object3D();
-      this.yaw.position.y = 10;
+      this.yaw.position.y = 0;
       this.yaw.add(this.pitch);
 
     },
@@ -73480,6 +73500,7 @@ AFRAME.registerComponent('joysticks-movement', {
 
         prevInitialRotation.copy(initialRotation);
 
+
         // If external controls have been active in last 500ms, wait.
         if (tCurrent - tLastExternalActivity < DEBOUNCE) {
           return;
@@ -73495,10 +73516,11 @@ AFRAME.registerComponent('joysticks-movement', {
         if (tLastExternalActivity > tLastLocalActivity && !lookVector.lengthSq()) {
           return;
         }
-
+        this.yaw.rotation.y = this.el.object3D.rotation.y;
         var sensitivity = this.data.sensitivity;
         var checkType = this.checkControllerType();
         if ( checkType && checkType.type != this.types.GAMEPAD ) {
+          //this bit means that the joystick must be set back to 0 before being applied again, i.e. quantized
           var act = !this.lastAction;
           if (!lookVector.lengthSq()) {
             this.lastAction = false;
@@ -73598,7 +73620,7 @@ AFRAME.registerComponent('joysticks-movement', {
 
 "use strict";
 /*I copied this from
-* https://github.com/mrdoob/three.js/blob/87cd4caca11544c0914d3828b299c8939bc981b2/examples/js/controls/VRControls.js
+* https://github.com/mrdoob/three.js/blob/dev/examples/js/controls/VRControls.js
 * */
 /* harmony default export */ __webpack_exports__["a"] = (function (object, onError) {
   var scope = this;

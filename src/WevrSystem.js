@@ -86,6 +86,7 @@ AFRAME.registerSystem('wevr', {
             position="0 0 -1"
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: darkgrey; shader: flat"></a-entity>
+    <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
     </a-entity>
     <a-entity wevr-player-hand="right" laser-controls="hand:right" hand-controls="right" ></a-entity>
     <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
@@ -93,7 +94,17 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpAudio(broker, sceneEl) {
-    broker.onaudio = (stream, peer) => {
+    broker.onaudio = () => {
+      var el = document.getElementById("audioinfo");
+      if (el) {
+        if (broker.audioState == "success") {
+          el.setAttribute("visible", "false");
+        } else {
+          el.setAttribute("text","value",broker.audioState)
+        }
+      }
+    };
+    broker.onpeeraudio = (stream, peer) => {
       const browser = detect();
       switch (browser && browser.name) {
         case 'chrome':
