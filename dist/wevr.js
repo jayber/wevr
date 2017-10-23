@@ -28098,7 +28098,7 @@ AFRAME.registerSystem('wevr', {
             geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
             material="color: darkgrey; shader: flat"></a-entity>
     </a-entity>
-    <a-entity wevr-player-hand="right" hand-controls="right" laser-controls="hand:right"></a-entity>
+    <a-entity wevr-player-hand="right" laser-controls="hand:right" hand-controls="right" ></a-entity>
     <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
     sceneEl.appendChild(element);
   },
