@@ -28057,7 +28057,7 @@ AFRAME.registerSystem('wevr', {
   setUpPeerConnectionChecks(broker, channels) {
     broker.oncheckconnections = (peers) => {this.checkConnections(peers)};
     channels.addEventListener("wevr.peer-ping", (param, peer) => {
-      if (window.wevr.id!="$b") this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
+      this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
     });
     broker.onreconnect = () => {
       location.reload();
