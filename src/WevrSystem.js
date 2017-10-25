@@ -4,6 +4,7 @@ import StateHandler from "./StateHandler.js";
 import DataChannels from "./DataChannels.js";
 import PositionalAudio from "./PositionalAudio.js";
 import {detect} from 'detect-browser';
+import log from "./Utils";
 import * as THREE from 'three';
 import * as _ from 'lodash';
 
@@ -44,16 +45,17 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpPeerConnectionChecks(broker, channels) {
-    broker.oncheckconnections = (peers) => {this.checkConnections(peers)};
+    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
     channels.addEventListener("wevr.peer-ping", (param, peer) => {
       this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
     });
     broker.onreconnect = () => {
+      log("received reconnect. reloading: " + window.wevr.id);
       location.reload();
     }
   },
 
-  checkConnections(peers) {
+  checkConnections(peers, broker) {
     this.pingReplies = [];
     this.pingRecpients = peers;
     var self = this;
@@ -65,10 +67,15 @@ AFRAME.registerSystem('wevr', {
     this.channels.broadcast("wevr.peer-ping",{});
     setTimeout(()=> {
         if (self.pingRecpients.length != self.pingReplies.length) {
-          this.signaller.signal({
-            event: "wevr.peer-ping-failure",
-            data: _.difference(self.pingRecpients, self.pingReplies)
-          })
+          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
+            log("no answers, i might be the problem");
+            broker.onreconnect();
+          } else {
+            this.signaller.signal({
+              event: "wevr.peer-ping-failure",
+              data: _.difference(self.pingRecpients, self.pingReplies)
+            })
+          }
         }
       }
       , 30000);

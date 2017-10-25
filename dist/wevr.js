@@ -129,12 +129,6 @@ function readCookie(name) {
   return null;
 }
 
-
-window.addEventListener('error', function (e, url, line) {
-  var line = (url ? url : "") + ":" + (line ? line : "");
-  errorLog(e, line);
-});
-
 /***/ }),
 /* 1 */
 /***/ (function(module, exports, __webpack_require__) {
@@ -28006,9 +28000,11 @@ return jQuery;
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__ = __webpack_require__(13);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser__ = __webpack_require__(14);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_detect_browser__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_three__ = __webpack_require__(17);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_lodash__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7_lodash__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Utils__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_three__ = __webpack_require__(17);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_8_lodash__);
+
 
 
 
@@ -28055,16 +28051,17 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpPeerConnectionChecks(broker, channels) {
-    broker.oncheckconnections = (peers) => {this.checkConnections(peers)};
+    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
     channels.addEventListener("wevr.peer-ping", (param, peer) => {
       this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
     });
     broker.onreconnect = () => {
+      Object(__WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */])("received reconnect. reloading: " + window.wevr.id);
       location.reload();
     }
   },
 
-  checkConnections(peers) {
+  checkConnections(peers, broker) {
     this.pingReplies = [];
     this.pingRecpients = peers;
     var self = this;
@@ -28076,10 +28073,15 @@ AFRAME.registerSystem('wevr', {
     this.channels.broadcast("wevr.peer-ping",{});
     setTimeout(()=> {
         if (self.pingRecpients.length != self.pingReplies.length) {
-          this.signaller.signal({
-            event: "wevr.peer-ping-failure",
-            data: __WEBPACK_IMPORTED_MODULE_7_lodash__["difference"](self.pingRecpients, self.pingReplies)
-          })
+          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
+            Object(__WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */])("no answers, i might be the problem");
+            broker.onreconnect();
+          } else {
+            this.signaller.signal({
+              event: "wevr.peer-ping-failure",
+              data: __WEBPACK_IMPORTED_MODULE_8_lodash__["difference"](self.pingRecpients, self.pingReplies)
+            })
+          }
         }
       }
       , 30000);
@@ -28140,16 +28142,16 @@ AFRAME.registerSystem('wevr', {
       let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
 
       channels.addEventListenerForPeer(peer, "wevr.movement-init", (event) => {
-        element.object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_6_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
-        element.object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_6_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
+        element.object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
+        element.object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
         element.setAttribute("visible", "true");
       });
 
       channels.addEventListenerForPeer(peer, `wevr.movement-init.hand`, (event) => {
         let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar-hand", `peer:${peer};hand:${event.hand}`);
         var object3D = element.object3D;
-        object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_6_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
-        object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_6_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
+        object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
+        object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
         element.setAttribute("visible", "true");
       });
     });
@@ -28174,9 +28176,9 @@ AFRAME.registerSystem('wevr', {
   },
 
   updateMovement(element, event, component) {
-    component.targetPosition = new __WEBPACK_IMPORTED_MODULE_6_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z);
+    component.targetPosition = new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z);
     component.startPosition = element.object3D.position.clone();
-    component.targetRotation = new __WEBPACK_IMPORTED_MODULE_6_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w);
+    component.targetRotation = new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w);
     component.timeUpdated = Date.now();
   },
 

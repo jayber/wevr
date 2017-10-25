@@ -45,9 +45,3 @@ function readCookie(name) {
   }
   return null;
 }
-
-
-window.addEventListener('error', function (e, url, line) {
-  var line = (url ? url : "") + ":" + (line ? line : "");
-  errorLog(e, line);
-});
