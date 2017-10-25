@@ -17346,7 +17346,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__index_js__ = __webpack_require__(4);
 AFRAME.registerSystem('wevr-auto-start', {
   init() {
-    var wevr = this.systems.wevr;
+    var wevr = this.el.systems.wevr;
     wevr.data.startOnLoad = true;
     wevr.start();
   }
