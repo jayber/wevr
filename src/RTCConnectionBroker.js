@@ -54,7 +54,7 @@ class RTCConnectionBroker {
       this.reconnect();
     });
     this.listen("wevr.id", (data) => {
-      console.log(`I am ${data}`);
+      log.debug(`I am ${data}`);
       window.wevr.id = data;
     });
   }
@@ -64,7 +64,7 @@ class RTCConnectionBroker {
   }
 
   connectTo(recipient) {
-    console.log(`gonna connect to ${recipient}`);
+    log.debug(`gonna connect to ${recipient}`);
     let connection = new RTCPeerConnection(this.iceConfiguration);
     this.connections[recipient] = connection;
 
@@ -74,17 +74,18 @@ class RTCConnectionBroker {
   }
 
   setUpConnection(connection, peer) {
+    var self = this;
     connection.oniceconnectionstatechange = (e) => {
-      log(`${peer} state changed to ${connection.iceConnectionState}`, true);
+      log.debug(`${peer} state changed to ${connection.iceConnectionState}`, true);
       if (connection.iceConnectionState == 'failed') {
-        this.signaller.signal({
+        self.signaller.signal({
           event: "wevr.peer-ping-failure",
           data: [peer]
         })
       }
     };
     connection.onnegotiationneeded = (e) => {
-      log(`${peer} negotiation needed`, true);
+      log.debug(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);
     return this.addAudio(connection, peer);
@@ -139,7 +140,7 @@ class RTCConnectionBroker {
   }
 
   acceptOffer(data) {
-    console.log(`accepting offer from ${data.from}`);
+    log.debug(`accepting offer from ${data.from}`);
     let connection = new RTCPeerConnection(this.iceConfiguration);
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
@@ -155,7 +156,7 @@ class RTCConnectionBroker {
   }
 
   acceptAnswer(data) {
-    console.log(`accepting answer from ${data.from}`);
+    log.debug(`accepting answer from ${data.from}`);
     let connection = this.connections[data.from];
     connection.setRemoteDescription(new RTCSessionDescription(data.payload));
     this.sendCachedCandidates(data.from);
@@ -179,7 +180,7 @@ class RTCConnectionBroker {
   }
 
   acceptIceCandidate(data) {
-    console.log(`accepting ice-candidate from ${data.from}`);
+    log.debug(`accepting ice-candidate from ${data.from}`);
     let connection = this.connections[data.from];
     connection.addIceCandidate(new RTCIceCandidate(data.payload));
     if (!this.sending) {
@@ -194,7 +195,7 @@ class RTCConnectionBroker {
     }
     var element = document.getElementById(peer);
     if (element) {
-      log(`removing ${peer}`, true);
+      log.debug(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
   }

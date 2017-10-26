@@ -78,23 +78,43 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony export (immutable) */ __webpack_exports__["a"] = log;
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_jquery__);
 
 
-function log (message, server = false, echo = true ) {
-  if (server) {
-    let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
-    __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.get("log", {user: name, message: message});
+class Log {
+  constructor() {
+    this.level = (window.wevr && (window.wevr.logLevel != undefined))?window.wevr.logLevel:3;
   }
-  if (echo) {
-    console.log(message);
+
+  debug(message, server = false, echo = true) {
+    if (this.level > 2) {
+      this.output(message, server, echo);
+    }
+  }
+
+  trace(message, server = false, echo = true) {
+    if (this.level > 3) {
+      this.output(message, server, echo);
+    }
+  }
+
+  output(message, server, echo) {
+    if (server) {
+      let name = window.wevr && window.wevr.id + "-" + (readCookie('name') || '[none]');
+      __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.get("log", {user: name, message: message});
+    }
+
+    if (echo) {
+      console.log(message);
+    }
   }
 }
 
-function errorLog (e, line) {
-  let name =  window.wevr.id + "-" + (readCookie('name') || '[none]');
+/* harmony default export */ __webpack_exports__["a"] = (new Log());
+
+function errorLog(e, line) {
+  let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
 
   var stack = line;
   var data;
@@ -121,10 +141,10 @@ function errorLog (e, line) {
 function readCookie(name) {
   var nameEQ = name + "=";
   var ca = document.cookie.split(';');
-  for(var i=0;i < ca.length;i++) {
+  for (var i = 0; i < ca.length; i++) {
     var c = ca[i];
-    while (c.charAt(0)==' ') c = c.substring(1,c.length);
-    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
   }
   return null;
 }
@@ -17251,7 +17271,7 @@ class DataChannels {
 
   registerChannelHandlers(channel, peer) {
     let handler = (event) => {
-      Object(__WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */])(`data channel ${peer}: `+JSON.stringify(event), true);
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug(`data channel ${peer}: `+JSON.stringify(event), true);
     };
     channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
     channel.onclose = handler;
@@ -17260,7 +17280,7 @@ class DataChannels {
 
   messageHandler(event, peer) {
     var msg = JSON.parse(event.data);
-    console.log(peer+" data channel received: " + event.data);
+    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].trace(peer+" data channel received: " + event.data);
     if (msg.event === "ready"){
       this.ready[peer] = true;
     }
@@ -17278,6 +17298,12 @@ class DataChannels {
     if (type === "ready" && this.ready[peer]) {
       this.dispatch({event: "ready"}, peer);
     }
+  }
+
+  removeAllPeerListeners(type) {
+    Object.keys(this.peerListeners).forEach( (key) => {
+      delete this.peerListeners[key][type];
+    })
   }
 
   addEventListener(type, listener) {
@@ -17474,7 +17500,7 @@ AFRAME.registerComponent('wevr-player', {
 
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo " + peer, false);
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init movement: " + peer, false);
 
     });
   },
@@ -17548,7 +17574,7 @@ AFRAME.registerComponent('wevr-player-hand', {
           position: this.position,
           quaternion: this.quaternion
         });
-        Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])("sendTo hand:" + this.data + peer, false);
+        __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init hand movement: " + this.data + peer, false);
       });
 
     } else {
@@ -28056,7 +28082,7 @@ AFRAME.registerSystem('wevr', {
       this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
     });
     broker.onreconnect = () => {
-      Object(__WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */])("received reconnect. reloading: " + window.wevr.id);
+      __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("received reconnect. reloading: " + window.wevr.id);
       location.reload();
     }
   },
@@ -28065,6 +28091,7 @@ AFRAME.registerSystem('wevr', {
     this.pingReplies = [];
     this.pingRecpients = peers;
     var self = this;
+    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
     peers.forEach((peer) => {
       self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
         self.pingReplies.push(peer);
@@ -28074,7 +28101,7 @@ AFRAME.registerSystem('wevr', {
     setTimeout(()=> {
         if (self.pingRecpients.length != self.pingReplies.length) {
           if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
-            Object(__WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */])("no answers, i might be the problem");
+            __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("no answers, i might be the problem");
             broker.onreconnect();
           } else {
             this.signaller.signal({
@@ -28101,7 +28128,7 @@ AFRAME.registerSystem('wevr', {
             material="color: darkgrey; shader: flat"></a-entity>
     <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
     </a-entity>
-    <a-entity wevr-player-hand="right" laser-controls="hand:right" hand-controls="right" ></a-entity>
+    <a-entity wevr-player-hand="right" hand-controls="right" cursor="downEvents:triggerdown;upEvents:triggerup" raycaster="showLine:true"></a-entity>
     <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
     sceneEl.appendChild(element);
   },
@@ -28211,6 +28238,9 @@ AFRAME.registerSystem('wevr', {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(0);
+
+
 class SignallingClient {
 
   constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
@@ -28238,7 +28268,7 @@ class SignallingClient {
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
-        console.log("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
+        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
         setTimeout(() => {
           try {
             this.start();
@@ -28247,13 +28277,13 @@ class SignallingClient {
           }
         }, 1000 * this.secondsTilRetry);
       } else {
-        console.log("ws closed! - giving up");
+        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws closed! - giving up");
       }
     };
 
     ws.onopen = () => {
       this.secondsTilRetry = 2;
-      console.log("ws opened");
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws opened");
     };
 
     ws.onerror = (error) => {
@@ -28264,7 +28294,7 @@ class SignallingClient {
       try {
         var msg = JSON.parse(event.data);
         if (msg.event != "wevr.ping") {
-          console.log("ws received: " + event.data);
+          __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws received: " + event.data);
         }
         this.dispatch(msg);
       } catch (e) {
@@ -28295,7 +28325,7 @@ class SignallingClient {
 
   signal(msg) {
     let msgString = JSON.stringify(msg);
-    console.log("signaling: " + msgString);
+    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("signaling: " + msgString);
     this.ws.send(msgString);
   }
 }
@@ -28364,7 +28394,7 @@ class RTCConnectionBroker {
       this.reconnect();
     });
     this.listen("wevr.id", (data) => {
-      console.log(`I am ${data}`);
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`I am ${data}`);
       window.wevr.id = data;
     });
   }
@@ -28374,7 +28404,7 @@ class RTCConnectionBroker {
   }
 
   connectTo(recipient) {
-    console.log(`gonna connect to ${recipient}`);
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`gonna connect to ${recipient}`);
     let connection = new RTCPeerConnection(this.iceConfiguration);
     this.connections[recipient] = connection;
 
@@ -28384,17 +28414,18 @@ class RTCConnectionBroker {
   }
 
   setUpConnection(connection, peer) {
+    var self = this;
     connection.oniceconnectionstatechange = (e) => {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} state changed to ${connection.iceConnectionState}`, true);
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} state changed to ${connection.iceConnectionState}`, true);
       if (connection.iceConnectionState == 'failed') {
-        this.signaller.signal({
+        self.signaller.signal({
           event: "wevr.peer-ping-failure",
           data: [peer]
         })
       }
     };
     connection.onnegotiationneeded = (e) => {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`${peer} negotiation needed`, true);
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} negotiation needed`, true);
     };
     this.handleIceCandidates(connection, peer);
     return this.addAudio(connection, peer);
@@ -28449,7 +28480,7 @@ class RTCConnectionBroker {
   }
 
   acceptOffer(data) {
-    console.log(`accepting offer from ${data.from}`);
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting offer from ${data.from}`);
     let connection = new RTCPeerConnection(this.iceConfiguration);
     connection.ondatachannel = (event) => {
       event.channel.onopen = () => {
@@ -28465,7 +28496,7 @@ class RTCConnectionBroker {
   }
 
   acceptAnswer(data) {
-    console.log(`accepting answer from ${data.from}`);
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting answer from ${data.from}`);
     let connection = this.connections[data.from];
     connection.setRemoteDescription(new RTCSessionDescription(data.payload));
     this.sendCachedCandidates(data.from);
@@ -28489,7 +28520,7 @@ class RTCConnectionBroker {
   }
 
   acceptIceCandidate(data) {
-    console.log(`accepting ice-candidate from ${data.from}`);
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting ice-candidate from ${data.from}`);
     let connection = this.connections[data.from];
     connection.addIceCandidate(new RTCIceCandidate(data.payload));
     if (!this.sending) {
@@ -28504,7 +28535,7 @@ class RTCConnectionBroker {
     }
     var element = document.getElementById(peer);
     if (element) {
-      Object(__WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */])(`removing ${peer}`, true);
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`removing ${peer}`, true);
       element.parentNode.removeChild(element);
     }
   }

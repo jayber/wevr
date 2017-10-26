@@ -1,3 +1,5 @@
+import log from "./Utils";
+
 export default class SignallingClient {
 
   constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
@@ -25,7 +27,7 @@ export default class SignallingClient {
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
-        console.log("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
+        log.debug("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
         setTimeout(() => {
           try {
             this.start();
@@ -34,13 +36,13 @@ export default class SignallingClient {
           }
         }, 1000 * this.secondsTilRetry);
       } else {
-        console.log("ws closed! - giving up");
+        log.debug("ws closed! - giving up");
       }
     };
 
     ws.onopen = () => {
       this.secondsTilRetry = 2;
-      console.log("ws opened");
+      log.debug("ws opened");
     };
 
     ws.onerror = (error) => {
@@ -51,7 +53,7 @@ export default class SignallingClient {
       try {
         var msg = JSON.parse(event.data);
         if (msg.event != "wevr.ping") {
-          console.log("ws received: " + event.data);
+          log.debug("ws received: " + event.data);
         }
         this.dispatch(msg);
       } catch (e) {
@@ -82,7 +84,7 @@ export default class SignallingClient {
 
   signal(msg) {
     let msgString = JSON.stringify(msg);
-    console.log("signaling: " + msgString);
+    log.debug("signaling: " + msgString);
     this.ws.send(msgString);
   }
 }

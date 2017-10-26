@@ -96,7 +96,7 @@ AFRAME.registerComponent('wevr-player', {
 
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      log("sendTo " + peer, false);
+      log.debug("init movement: " + peer, false);
 
     });
   },
@@ -170,7 +170,7 @@ AFRAME.registerComponent('wevr-player-hand', {
           position: this.position,
           quaternion: this.quaternion
         });
-        log("sendTo hand:" + this.data + peer, false);
+        log.debug("init hand movement: " + this.data + peer, false);
       });
 
     } else {

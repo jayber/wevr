@@ -50,7 +50,7 @@ AFRAME.registerSystem('wevr', {
       this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
     });
     broker.onreconnect = () => {
-      log("received reconnect. reloading: " + window.wevr.id);
+      log.debug("received reconnect. reloading: " + window.wevr.id);
       location.reload();
     }
   },
@@ -59,6 +59,7 @@ AFRAME.registerSystem('wevr', {
     this.pingReplies = [];
     this.pingRecpients = peers;
     var self = this;
+    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
     peers.forEach((peer) => {
       self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
         self.pingReplies.push(peer);
@@ -68,7 +69,7 @@ AFRAME.registerSystem('wevr', {
     setTimeout(()=> {
         if (self.pingRecpients.length != self.pingReplies.length) {
           if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
-            log("no answers, i might be the problem");
+            log.debug("no answers, i might be the problem");
             broker.onreconnect();
           } else {
             this.signaller.signal({
@@ -95,7 +96,7 @@ AFRAME.registerSystem('wevr', {
             material="color: darkgrey; shader: flat"></a-entity>
     <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
     </a-entity>
-    <a-entity wevr-player-hand="right" laser-controls="hand:right" hand-controls="right" ></a-entity>
+    <a-entity wevr-player-hand="right" hand-controls="right" cursor="downEvents:triggerdown;upEvents:triggerup" raycaster="showLine:true"></a-entity>
     <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
     sceneEl.appendChild(element);
   },
