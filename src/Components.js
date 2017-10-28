@@ -47,7 +47,6 @@ AFRAME.registerComponent('wevr-avatar', {
     var channels = this.system.channels;
     channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
       this.system.updateMovement(this.el, event, this);
-
     })
   },
 

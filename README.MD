@@ -4,7 +4,7 @@ Wevr is the one-stop-shop for adding social (i.e. multiuser) capabilities to you
 
 Just by adding the script tag to your page (after the aframe import), wevr will add player elements for camera, head tracking, hands, movement and interactions control.
 
-Then avatars for every user who visits your page at the same time will be created, with hands if they have them. Microphone audio will also be enabled automatically so you can see and hear each other,
+Then avatars for every user who visits your page will be created, with hands if they have them. Microphone audio will also be enabled automatically so you can see and hear each other,
 with positional audio if supported (i.e. Firefox).
 
 Finally wevr has support for game scope state (i.e. key/value pairs that are synched to all users, as well as any new users who join later on). Documentation to follow.
@@ -13,7 +13,7 @@ Just add:
 
     <script src="https://jayber.github.io/wevr/dist/wevr.js"></script>
 
-to your page.
+to your page. (Only tested with A-Frame 0.6.1 and above)
 
 Wevr uses WebRTC to sync players with avatars and broadcast audio, the web audio API for positional audio, and websockets for signaling and game state.
 VRLobby.co provides a server for WebRTC signalling and to store game state: https://github.com/jayber/wevr-server
