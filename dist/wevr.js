@@ -29176,7 +29176,8 @@ class RTCConnectionBroker {
       self.audioState = 'success';
       self.onaudio();
       return audio;
-    }).catch(() => {
+    }).catch((e) => {
+      console.error(e);
       self.audioState = 'mute';
       self.onaudio();
     });
@@ -29261,13 +29262,13 @@ class RTCConnectionBroker {
   handleIceCandidates(connection, peer) {
     this.candidates[peer] = [];
     connection.onicecandidate = (event) => {
-        if (event.candidate) {
-          if (this.sending) {
+      if (event.candidate) {
+        if (this.sending) {
           this.signalCandidate(peer, event.candidate);
-          } else {
-            this.candidates[peer].push(event.candidate);
-          }
+        } else {
+          this.candidates[peer].push(event.candidate);
         }
+      }
     };
   }
 
@@ -29283,12 +29284,15 @@ class RTCConnectionBroker {
       this.onpeeraudio(e.streams[0], peer);
     };
     return this.audio.then((stream) => {
-      stream.getTracks().forEach(track => {
-        connection.addTrack(track, stream);
-      });
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          connection.addTrack(track, stream);
+        });
+      }
     }).catch(function (err) {
       console.error(err);
     });
+
   }
 
   acceptOffer(data) {
