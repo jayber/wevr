@@ -25,7 +25,7 @@ class RTCConnectionBroker {
       self.onaudio();
       return audio;
     }).catch((e) => {
-      console.error(e);
+      log.error(e);
       self.audioState = 'mute';
       self.onaudio();
     });
@@ -55,7 +55,7 @@ class RTCConnectionBroker {
       this.reconnect();
     });
     this.listen("wevr.id", (data) => {
-      log.debug(`I am ${data}`);
+      log.info(`I am ${data}`);
       window.wevr.id = data;
     });
   }
@@ -65,7 +65,7 @@ class RTCConnectionBroker {
   }
 
   connectTo(recipient) {
-    log.debug(`gonna connect to ${recipient}`);
+    log.info(`gonna connect to ${recipient}`);
     let connection = new RTCPeerConnection(this.iceConfiguration);
     this.connections[recipient] = connection;
 
@@ -138,7 +138,7 @@ class RTCConnectionBroker {
         });
       }
     }).catch(function (err) {
-      console.error(err);
+      log.error(err);
     });
 
   }

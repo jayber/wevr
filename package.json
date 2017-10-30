@@ -28,7 +28,6 @@
   "dependencies": {
     "aframe-joysticks-movement-component": "^0.1.2",
     "detect-browser": "^2.0.0",
-    "jquery": "^3.2.1",
     "lodash": "^4.17.4",
     "three": "^0.87.1",
     "webrtc-adapter": "^5.0.6"

@@ -1,60 +1,29 @@
-import $ from "jquery";
-
 class Log {
   constructor() {
     this.level = (window.wevr && (window.wevr.logLevel != undefined))?window.wevr.logLevel:3;
   }
 
+  info(message, server = false, echo = true) {
+    console.info(message);
+  }
+
   debug(message, server = false, echo = true) {
-    if (this.level > 2) {
-      this.output(message, server, echo);
-    }
+    console.debug(message);
   }
 
   trace(message, server = false, echo = true) {
-    if (this.level > 3) {
-      this.output(message, server, echo);
-    }
+    console.debug(message);
   }
 
-  output(message, server, echo) {
-    if (server) {
-      let name = window.wevr && window.wevr.id + "-" + (readCookie('name') || '[none]');
-      $.get("log", {user: name, message: message});
-    }
-
-    if (echo) {
-      console.log(message);
+  error(e, line) {
+   try{
+      console.error(e);
+    } catch (error) {
     }
   }
 }
 
 export default new Log();
-
-function errorLog(e, line) {
-  let name = window.wevr.id + "-" + (readCookie('name') || '[none]');
-
-  var stack = line;
-  var data;
-  if (e.error) {
-    stack = e.error.stack;
-    data = {user: name, message: e.error.message, stack: stack};
-  } else if (e.message) {
-    if (e.stack) {
-      stack = e.stack;
-    }
-    data = {user: name, message: e.message, stack: stack};
-  } else {
-    if (!stack) {
-      stack = "[no stack available]"
-    }
-    data = {user: name, message: e, stack: stack};
-  }
-  $.get("error", data);
-
-  console.error(JSON.stringify(data));
-}
-
 
 function readCookie(name) {
   var nameEQ = name + "=";

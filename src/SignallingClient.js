@@ -27,26 +27,26 @@ export default class SignallingClient {
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
-        log.debug("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
+        log.info("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
         setTimeout(() => {
           try {
             this.start();
           } catch (e) {
-            console.error(e);
+            log.error(e);
           }
         }, 1000 * this.secondsTilRetry);
       } else {
-        log.debug("ws closed! - giving up");
+        log.info("ws closed! - giving up");
       }
     };
 
     ws.onopen = () => {
       this.secondsTilRetry = 2;
-      log.debug("ws opened");
+      log.info("ws opened");
     };
 
     ws.onerror = (error) => {
-      console.error(error);
+      log.error(error);
     };
 
     ws.onmessage = (event) => {
@@ -57,7 +57,7 @@ export default class SignallingClient {
         }
         this.dispatch(msg);
       } catch (e) {
-        console.error(e);
+        log.error(e);
       }
     };
     return ws;
