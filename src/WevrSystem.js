@@ -171,9 +171,16 @@ AFRAME.registerSystem('wevr', {
   },
 
   updateMovement(element, event, component) {
-    component.targetPosition = new THREE.Vector3(event.position.x, event.position.y, event.position.z);
-    component.startPosition = element.object3D.position.clone();
-    component.targetRotation = new THREE.Quaternion(event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w);
+    component.targetPosition.x = event.position.x;
+    component.targetPosition.y = event.position.y;
+    component.targetPosition.z = event.position.z;
+    component.startPosition.x = element.object3D.position.x;
+    component.startPosition.y = element.object3D.position.y;
+    component.startPosition.z = element.object3D.position.z;
+    component.targetRotation.x = event.quaternion._x;
+    component.targetRotation.y = event.quaternion._y;
+    component.targetRotation.z = event.quaternion._z;
+    component.targetRotation.w = event.quaternion._w;
     component.timeUpdated = Date.now();
   },
 

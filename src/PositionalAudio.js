@@ -7,31 +7,43 @@ class PositionalAudio {
   }
 
   updateListener(matrix) {
-
     var p = new THREE.Vector3();
-    p.setFromMatrixPosition(matrix);
+    var vec = new THREE.Vector3(0, 0, 1);
+    var up = new THREE.Vector3(0, -1, 0);
 
-    this.audioCtx.listener.setPosition(p.x, p.y, p.z);
+    this.updateListener = function (matrix) {
+      vec.x = 0;
+      vec.y = 0;
+      vec.z = 1;
+      up.x = 0;
+      up.y = -1;
+      up.z = 0;
+      p.x = 0;
+      p.y = 0;
+      p.z = 0;
+      p.setFromMatrixPosition(matrix);
 
-    var mx = matrix.elements[12], my = matrix.elements[13], mz = matrix.elements[14];
-    matrix.elements[12] = matrix.elements[13] = matrix.elements[14] = 0;
+      this.audioCtx.listener.setPosition(p.x, p.y, p.z);
+
+      var mx = matrix.elements[12], my = matrix.elements[13], mz = matrix.elements[14];
+      matrix.elements[12] = matrix.elements[13] = matrix.elements[14] = 0;
 
 // Multiply the orientation vector by the world matrix of the camera.
-    var vec = new THREE.Vector3(0,0,1);
-    vec.applyMatrix4(matrix);
-    vec.normalize();
+      vec.applyMatrix4(matrix);
+      vec.normalize();
 
 // Multiply the up vector by the world matrix.
-    var up = new THREE.Vector3(0,-1,0);
-    up.applyMatrix4(matrix);
-    up.normalize();
+      up.applyMatrix4(matrix);
+      up.normalize();
 
 // Set the orientation and the up-vector for the listener.
-    this.audioCtx.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
+      this.audioCtx.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
 
-    matrix.elements[12] = mx;
-    matrix.elements[13] = my;
-    matrix.elements[14] = mz;
+      matrix.elements[12] = mx;
+      matrix.elements[13] = my;
+      matrix.elements[14] = mz;
+    };
+    this.updateListener(matrix);
   }
 
   usePositionalAudio(track, peer) {

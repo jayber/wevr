@@ -1,5 +1,6 @@
 import * as _ from 'lodash';
 import log from "./Utils";
+import * as THREE from 'three';
 
 
 AFRAME.registerComponent('wevr-avatar', {
@@ -45,6 +46,10 @@ AFRAME.registerComponent('wevr-avatar', {
     this.system = this.el.sceneEl.systems.wevr;
 
     var channels = this.system.channels;
+    this.targetPosition = new THREE.Vector3();
+    this.startPosition = new THREE.Vector3();
+    this.targetRotation = new THREE.Quaternion();
+
     channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
       this.system.updateMovement(this.el, event, this);
     })
@@ -73,6 +78,9 @@ AFRAME.registerComponent('wevr-avatar-hand', {
     this.system = this.el.sceneEl.systems.wevr;
     var channels = this.system.channels;
 
+    this.targetPosition = new THREE.Vector3();
+    this.startPosition = new THREE.Vector3();
+    this.targetRotation = new THREE.Quaternion();
     channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
       this.system.updateMovement(this.el, event, this);
     });
@@ -96,7 +104,6 @@ AFRAME.registerComponent('wevr-player', {
     this.system.channels.addEventListener("ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
       log.debug("init movement: " + peer, false);
-
     });
   },
 

@@ -70,7 +70,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 6);
+/******/ 	return __webpack_require__(__webpack_require__.s = 7);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -17359,7 +17359,7 @@ function readCookie(name) {
   }
 }.call(this));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(9)(module)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(10)(module)))
 
 /***/ }),
 /* 3 */
@@ -17390,2224 +17390,6 @@ module.exports = g;
 
 /***/ }),
 /* 4 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(1);
-
-
-
-class DataChannels {
-
-  constructor(broker) {
-    this.channels = {};
-    this.listeners = {};
-    this.peerListeners = {};
-    this.ready = {};
-    broker.onchannel = (peer, dataChannel) => {
-      this.addChannel(peer, dataChannel);
-    };
-  }
-
-  addChannel(peer, dataChannel) {
-    this.channels[peer] = dataChannel;
-    this.registerChannelHandlers(dataChannel, peer);
-    this.dispatch({event: "open"},peer);
-    dataChannel.send(JSON.stringify({event: "ready"}));
-  }
-
-  registerChannelHandlers(channel, peer) {
-    let handler = (event) => {
-      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug(`data channel ${peer}: `+JSON.stringify(event), true);
-    };
-    channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
-    channel.onclose = handler;
-    channel.onerror = handler;
-  }
-
-  messageHandler(event, peer) {
-    var msg = JSON.parse(event.data);
-    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].trace(peer+" data channel received: " + event.data);
-    if (msg.event === "ready"){
-      this.ready[peer] = true;
-    }
-    this.dispatch(msg, peer);
-  }
-
-  addEventListenerForPeer(peer, type, listener) {
-    if (!(peer in this.peerListeners)) {
-      this.peerListeners[peer] = {};
-    }
-    if (!(type in this.peerListeners[peer])) {
-      this.peerListeners[peer][type] = [];
-    }
-    this.peerListeners[peer][type].push(listener);
-    if (type === "ready" && this.ready[peer]) {
-      this.dispatch({event: "ready"}, peer);
-    }
-  }
-
-  removeAllPeerListeners(type) {
-    Object.keys(this.peerListeners).forEach( (key) => {
-      delete this.peerListeners[key][type];
-    })
-  }
-
-  addEventListener(type, listener) {
-    if (!(type in this.listeners)) {
-      this.listeners[type] = [];
-    }
-    this.listeners[type].push(listener);
-    if (type === "ready") {
-      Object.keys(this.ready).forEach((key)=>{
-        this.dispatch({event: "ready"}, key);
-    });
-    }
-  }
-
-  sendTo(peer, event, data) {
-      let channel = this.channels[peer];
-      if (channel.readyState === "open") {
-        channel.send(JSON.stringify({event, data}));
-      } else {
-        channel.onopen = () => {
-          channel.send(JSON.stringify({event, data}));
-        }
-      }
-  }
-
-  broadcast(event, data) {
-    Object.keys(this.channels).forEach((peer) => {
-      let channel = this.channels[peer];
-      if (channel.readyState === "open") {
-        channel.send(JSON.stringify({event, data}));
-      } else {
-        channel.onopen = () => {
-          channel.send(JSON.stringify({event, data}));
-        }
-      }
-    });
-  }
-
-  dispatch(msg, peer) {
-    var type = msg.event;
-    var param = msg.data;
-    if (type in this.listeners) {
-      var stack = this.listeners[type];
-      stack.forEach((element) => {
-        element(param, peer);
-      });
-    }
-
-    if (peer in this.peerListeners && type in this.peerListeners[peer]) {
-      stack = this.peerListeners[peer][type];
-      stack.forEach((element) => {
-        element(param, peer);
-      });
-    }
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = DataChannels;
-
-
-/***/ }),
-/* 5 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
- /* eslint-env node */
-
-
-// SDP helpers.
-var SDPUtils = {};
-
-// Generate an alphanumeric identifier for cname or mids.
-// TODO: use UUIDs instead? https://gist.github.com/jed/982883
-SDPUtils.generateIdentifier = function() {
-  return Math.random().toString(36).substr(2, 10);
-};
-
-// The RTCP CNAME used by all peerconnections from the same JS.
-SDPUtils.localCName = SDPUtils.generateIdentifier();
-
-// Splits SDP into lines, dealing with both CRLF and LF.
-SDPUtils.splitLines = function(blob) {
-  return blob.trim().split('\n').map(function(line) {
-    return line.trim();
-  });
-};
-// Splits SDP into sessionpart and mediasections. Ensures CRLF.
-SDPUtils.splitSections = function(blob) {
-  var parts = blob.split('\nm=');
-  return parts.map(function(part, index) {
-    return (index > 0 ? 'm=' + part : part).trim() + '\r\n';
-  });
-};
-
-// Returns lines that start with a certain prefix.
-SDPUtils.matchPrefix = function(blob, prefix) {
-  return SDPUtils.splitLines(blob).filter(function(line) {
-    return line.indexOf(prefix) === 0;
-  });
-};
-
-// Parses an ICE candidate line. Sample input:
-// candidate:702786350 2 udp 41819902 8.8.8.8 60769 typ relay raddr 8.8.8.8
-// rport 55996"
-SDPUtils.parseCandidate = function(line) {
-  var parts;
-  // Parse both variants.
-  if (line.indexOf('a=candidate:') === 0) {
-    parts = line.substring(12).split(' ');
-  } else {
-    parts = line.substring(10).split(' ');
-  }
-
-  var candidate = {
-    foundation: parts[0],
-    component: parseInt(parts[1], 10),
-    protocol: parts[2].toLowerCase(),
-    priority: parseInt(parts[3], 10),
-    ip: parts[4],
-    port: parseInt(parts[5], 10),
-    // skip parts[6] == 'typ'
-    type: parts[7]
-  };
-
-  for (var i = 8; i < parts.length; i += 2) {
-    switch (parts[i]) {
-      case 'raddr':
-        candidate.relatedAddress = parts[i + 1];
-        break;
-      case 'rport':
-        candidate.relatedPort = parseInt(parts[i + 1], 10);
-        break;
-      case 'tcptype':
-        candidate.tcpType = parts[i + 1];
-        break;
-      case 'ufrag':
-        candidate.ufrag = parts[i + 1]; // for backward compability.
-        candidate.usernameFragment = parts[i + 1];
-        break;
-      default: // extension handling, in particular ufrag
-        candidate[parts[i]] = parts[i + 1];
-        break;
-    }
-  }
-  return candidate;
-};
-
-// Translates a candidate object into SDP candidate attribute.
-SDPUtils.writeCandidate = function(candidate) {
-  var sdp = [];
-  sdp.push(candidate.foundation);
-  sdp.push(candidate.component);
-  sdp.push(candidate.protocol.toUpperCase());
-  sdp.push(candidate.priority);
-  sdp.push(candidate.ip);
-  sdp.push(candidate.port);
-
-  var type = candidate.type;
-  sdp.push('typ');
-  sdp.push(type);
-  if (type !== 'host' && candidate.relatedAddress &&
-      candidate.relatedPort) {
-    sdp.push('raddr');
-    sdp.push(candidate.relatedAddress); // was: relAddr
-    sdp.push('rport');
-    sdp.push(candidate.relatedPort); // was: relPort
-  }
-  if (candidate.tcpType && candidate.protocol.toLowerCase() === 'tcp') {
-    sdp.push('tcptype');
-    sdp.push(candidate.tcpType);
-  }
-  if (candidate.ufrag) {
-    sdp.push('ufrag');
-    sdp.push(candidate.ufrag);
-  }
-  return 'candidate:' + sdp.join(' ');
-};
-
-// Parses an ice-options line, returns an array of option tags.
-// a=ice-options:foo bar
-SDPUtils.parseIceOptions = function(line) {
-  return line.substr(14).split(' ');
-}
-
-// Parses an rtpmap line, returns RTCRtpCoddecParameters. Sample input:
-// a=rtpmap:111 opus/48000/2
-SDPUtils.parseRtpMap = function(line) {
-  var parts = line.substr(9).split(' ');
-  var parsed = {
-    payloadType: parseInt(parts.shift(), 10) // was: id
-  };
-
-  parts = parts[0].split('/');
-
-  parsed.name = parts[0];
-  parsed.clockRate = parseInt(parts[1], 10); // was: clockrate
-  // was: channels
-  parsed.numChannels = parts.length === 3 ? parseInt(parts[2], 10) : 1;
-  return parsed;
-};
-
-// Generate an a=rtpmap line from RTCRtpCodecCapability or
-// RTCRtpCodecParameters.
-SDPUtils.writeRtpMap = function(codec) {
-  var pt = codec.payloadType;
-  if (codec.preferredPayloadType !== undefined) {
-    pt = codec.preferredPayloadType;
-  }
-  return 'a=rtpmap:' + pt + ' ' + codec.name + '/' + codec.clockRate +
-      (codec.numChannels !== 1 ? '/' + codec.numChannels : '') + '\r\n';
-};
-
-// Parses an a=extmap line (headerextension from RFC 5285). Sample input:
-// a=extmap:2 urn:ietf:params:rtp-hdrext:toffset
-// a=extmap:2/sendonly urn:ietf:params:rtp-hdrext:toffset
-SDPUtils.parseExtmap = function(line) {
-  var parts = line.substr(9).split(' ');
-  return {
-    id: parseInt(parts[0], 10),
-    direction: parts[0].indexOf('/') > 0 ? parts[0].split('/')[1] : 'sendrecv',
-    uri: parts[1]
-  };
-};
-
-// Generates a=extmap line from RTCRtpHeaderExtensionParameters or
-// RTCRtpHeaderExtension.
-SDPUtils.writeExtmap = function(headerExtension) {
-  return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
-      (headerExtension.direction && headerExtension.direction !== 'sendrecv'
-          ? '/' + headerExtension.direction
-          : '') +
-      ' ' + headerExtension.uri + '\r\n';
-};
-
-// Parses an ftmp line, returns dictionary. Sample input:
-// a=fmtp:96 vbr=on;cng=on
-// Also deals with vbr=on; cng=on
-SDPUtils.parseFmtp = function(line) {
-  var parsed = {};
-  var kv;
-  var parts = line.substr(line.indexOf(' ') + 1).split(';');
-  for (var j = 0; j < parts.length; j++) {
-    kv = parts[j].trim().split('=');
-    parsed[kv[0].trim()] = kv[1];
-  }
-  return parsed;
-};
-
-// Generates an a=ftmp line from RTCRtpCodecCapability or RTCRtpCodecParameters.
-SDPUtils.writeFmtp = function(codec) {
-  var line = '';
-  var pt = codec.payloadType;
-  if (codec.preferredPayloadType !== undefined) {
-    pt = codec.preferredPayloadType;
-  }
-  if (codec.parameters && Object.keys(codec.parameters).length) {
-    var params = [];
-    Object.keys(codec.parameters).forEach(function(param) {
-      params.push(param + '=' + codec.parameters[param]);
-    });
-    line += 'a=fmtp:' + pt + ' ' + params.join(';') + '\r\n';
-  }
-  return line;
-};
-
-// Parses an rtcp-fb line, returns RTCPRtcpFeedback object. Sample input:
-// a=rtcp-fb:98 nack rpsi
-SDPUtils.parseRtcpFb = function(line) {
-  var parts = line.substr(line.indexOf(' ') + 1).split(' ');
-  return {
-    type: parts.shift(),
-    parameter: parts.join(' ')
-  };
-};
-// Generate a=rtcp-fb lines from RTCRtpCodecCapability or RTCRtpCodecParameters.
-SDPUtils.writeRtcpFb = function(codec) {
-  var lines = '';
-  var pt = codec.payloadType;
-  if (codec.preferredPayloadType !== undefined) {
-    pt = codec.preferredPayloadType;
-  }
-  if (codec.rtcpFeedback && codec.rtcpFeedback.length) {
-    // FIXME: special handling for trr-int?
-    codec.rtcpFeedback.forEach(function(fb) {
-      lines += 'a=rtcp-fb:' + pt + ' ' + fb.type +
-      (fb.parameter && fb.parameter.length ? ' ' + fb.parameter : '') +
-          '\r\n';
-    });
-  }
-  return lines;
-};
-
-// Parses an RFC 5576 ssrc media attribute. Sample input:
-// a=ssrc:3735928559 cname:something
-SDPUtils.parseSsrcMedia = function(line) {
-  var sp = line.indexOf(' ');
-  var parts = {
-    ssrc: parseInt(line.substr(7, sp - 7), 10)
-  };
-  var colon = line.indexOf(':', sp);
-  if (colon > -1) {
-    parts.attribute = line.substr(sp + 1, colon - sp - 1);
-    parts.value = line.substr(colon + 1);
-  } else {
-    parts.attribute = line.substr(sp + 1);
-  }
-  return parts;
-};
-
-// Extracts the MID (RFC 5888) from a media section.
-// returns the MID or undefined if no mid line was found.
-SDPUtils.getMid = function(mediaSection) {
-  var mid = SDPUtils.matchPrefix(mediaSection, 'a=mid:')[0];
-  if (mid) {
-    return mid.substr(6);
-  }
-}
-
-SDPUtils.parseFingerprint = function(line) {
-  var parts = line.substr(14).split(' ');
-  return {
-    algorithm: parts[0].toLowerCase(), // algorithm is case-sensitive in Edge.
-    value: parts[1]
-  };
-};
-
-// Extracts DTLS parameters from SDP media section or sessionpart.
-// FIXME: for consistency with other functions this should only
-//   get the fingerprint line as input. See also getIceParameters.
-SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
-  var lines = SDPUtils.matchPrefix(mediaSection + sessionpart,
-      'a=fingerprint:');
-  // Note: a=setup line is ignored since we use the 'auto' role.
-  // Note2: 'algorithm' is not case sensitive except in Edge.
-  return {
-    role: 'auto',
-    fingerprints: lines.map(SDPUtils.parseFingerprint)
-  };
-};
-
-// Serializes DTLS parameters to SDP.
-SDPUtils.writeDtlsParameters = function(params, setupType) {
-  var sdp = 'a=setup:' + setupType + '\r\n';
-  params.fingerprints.forEach(function(fp) {
-    sdp += 'a=fingerprint:' + fp.algorithm + ' ' + fp.value + '\r\n';
-  });
-  return sdp;
-};
-// Parses ICE information from SDP media section or sessionpart.
-// FIXME: for consistency with other functions this should only
-//   get the ice-ufrag and ice-pwd lines as input.
-SDPUtils.getIceParameters = function(mediaSection, sessionpart) {
-  var lines = SDPUtils.splitLines(mediaSection);
-  // Search in session part, too.
-  lines = lines.concat(SDPUtils.splitLines(sessionpart));
-  var iceParameters = {
-    usernameFragment: lines.filter(function(line) {
-      return line.indexOf('a=ice-ufrag:') === 0;
-    })[0].substr(12),
-    password: lines.filter(function(line) {
-      return line.indexOf('a=ice-pwd:') === 0;
-    })[0].substr(10)
-  };
-  return iceParameters;
-};
-
-// Serializes ICE parameters to SDP.
-SDPUtils.writeIceParameters = function(params) {
-  return 'a=ice-ufrag:' + params.usernameFragment + '\r\n' +
-      'a=ice-pwd:' + params.password + '\r\n';
-};
-
-// Parses the SDP media section and returns RTCRtpParameters.
-SDPUtils.parseRtpParameters = function(mediaSection) {
-  var description = {
-    codecs: [],
-    headerExtensions: [],
-    fecMechanisms: [],
-    rtcp: []
-  };
-  var lines = SDPUtils.splitLines(mediaSection);
-  var mline = lines[0].split(' ');
-  for (var i = 3; i < mline.length; i++) { // find all codecs from mline[3..]
-    var pt = mline[i];
-    var rtpmapline = SDPUtils.matchPrefix(
-        mediaSection, 'a=rtpmap:' + pt + ' ')[0];
-    if (rtpmapline) {
-      var codec = SDPUtils.parseRtpMap(rtpmapline);
-      var fmtps = SDPUtils.matchPrefix(
-          mediaSection, 'a=fmtp:' + pt + ' ');
-      // Only the first a=fmtp:<pt> is considered.
-      codec.parameters = fmtps.length ? SDPUtils.parseFmtp(fmtps[0]) : {};
-      codec.rtcpFeedback = SDPUtils.matchPrefix(
-          mediaSection, 'a=rtcp-fb:' + pt + ' ')
-        .map(SDPUtils.parseRtcpFb);
-      description.codecs.push(codec);
-      // parse FEC mechanisms from rtpmap lines.
-      switch (codec.name.toUpperCase()) {
-        case 'RED':
-        case 'ULPFEC':
-          description.fecMechanisms.push(codec.name.toUpperCase());
-          break;
-        default: // only RED and ULPFEC are recognized as FEC mechanisms.
-          break;
-      }
-    }
-  }
-  SDPUtils.matchPrefix(mediaSection, 'a=extmap:').forEach(function(line) {
-    description.headerExtensions.push(SDPUtils.parseExtmap(line));
-  });
-  // FIXME: parse rtcp.
-  return description;
-};
-
-// Generates parts of the SDP media section describing the capabilities /
-// parameters.
-SDPUtils.writeRtpDescription = function(kind, caps) {
-  var sdp = '';
-
-  // Build the mline.
-  sdp += 'm=' + kind + ' ';
-  sdp += caps.codecs.length > 0 ? '9' : '0'; // reject if no codecs.
-  sdp += ' UDP/TLS/RTP/SAVPF ';
-  sdp += caps.codecs.map(function(codec) {
-    if (codec.preferredPayloadType !== undefined) {
-      return codec.preferredPayloadType;
-    }
-    return codec.payloadType;
-  }).join(' ') + '\r\n';
-
-  sdp += 'c=IN IP4 0.0.0.0\r\n';
-  sdp += 'a=rtcp:9 IN IP4 0.0.0.0\r\n';
-
-  // Add a=rtpmap lines for each codec. Also fmtp and rtcp-fb.
-  caps.codecs.forEach(function(codec) {
-    sdp += SDPUtils.writeRtpMap(codec);
-    sdp += SDPUtils.writeFmtp(codec);
-    sdp += SDPUtils.writeRtcpFb(codec);
-  });
-  var maxptime = 0;
-  caps.codecs.forEach(function(codec) {
-    if (codec.maxptime > maxptime) {
-      maxptime = codec.maxptime;
-    }
-  });
-  if (maxptime > 0) {
-    sdp += 'a=maxptime:' + maxptime + '\r\n';
-  }
-  sdp += 'a=rtcp-mux\r\n';
-
-  caps.headerExtensions.forEach(function(extension) {
-    sdp += SDPUtils.writeExtmap(extension);
-  });
-  // FIXME: write fecMechanisms.
-  return sdp;
-};
-
-// Parses the SDP media section and returns an array of
-// RTCRtpEncodingParameters.
-SDPUtils.parseRtpEncodingParameters = function(mediaSection) {
-  var encodingParameters = [];
-  var description = SDPUtils.parseRtpParameters(mediaSection);
-  var hasRed = description.fecMechanisms.indexOf('RED') !== -1;
-  var hasUlpfec = description.fecMechanisms.indexOf('ULPFEC') !== -1;
-
-  // filter a=ssrc:... cname:, ignore PlanB-msid
-  var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-  .map(function(line) {
-    return SDPUtils.parseSsrcMedia(line);
-  })
-  .filter(function(parts) {
-    return parts.attribute === 'cname';
-  });
-  var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
-  var secondarySsrc;
-
-  var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
-  .map(function(line) {
-    var parts = line.split(' ');
-    parts.shift();
-    return parts.map(function(part) {
-      return parseInt(part, 10);
-    });
-  });
-  if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
-    secondarySsrc = flows[0][1];
-  }
-
-  description.codecs.forEach(function(codec) {
-    if (codec.name.toUpperCase() === 'RTX' && codec.parameters.apt) {
-      var encParam = {
-        ssrc: primarySsrc,
-        codecPayloadType: parseInt(codec.parameters.apt, 10),
-        rtx: {
-          ssrc: secondarySsrc
-        }
-      };
-      encodingParameters.push(encParam);
-      if (hasRed) {
-        encParam = JSON.parse(JSON.stringify(encParam));
-        encParam.fec = {
-          ssrc: secondarySsrc,
-          mechanism: hasUlpfec ? 'red+ulpfec' : 'red'
-        };
-        encodingParameters.push(encParam);
-      }
-    }
-  });
-  if (encodingParameters.length === 0 && primarySsrc) {
-    encodingParameters.push({
-      ssrc: primarySsrc
-    });
-  }
-
-  // we support both b=AS and b=TIAS but interpret AS as TIAS.
-  var bandwidth = SDPUtils.matchPrefix(mediaSection, 'b=');
-  if (bandwidth.length) {
-    if (bandwidth[0].indexOf('b=TIAS:') === 0) {
-      bandwidth = parseInt(bandwidth[0].substr(7), 10);
-    } else if (bandwidth[0].indexOf('b=AS:') === 0) {
-      // use formula from JSEP to convert b=AS to TIAS value.
-      bandwidth = parseInt(bandwidth[0].substr(5), 10) * 1000 * 0.95
-          - (50 * 40 * 8);
-    } else {
-      bandwidth = undefined;
-    }
-    encodingParameters.forEach(function(params) {
-      params.maxBitrate = bandwidth;
-    });
-  }
-  return encodingParameters;
-};
-
-// parses http://draft.ortc.org/#rtcrtcpparameters*
-SDPUtils.parseRtcpParameters = function(mediaSection) {
-  var rtcpParameters = {};
-
-  var cname;
-  // Gets the first SSRC. Note that with RTX there might be multiple
-  // SSRCs.
-  var remoteSsrc = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-      .map(function(line) {
-        return SDPUtils.parseSsrcMedia(line);
-      })
-      .filter(function(obj) {
-        return obj.attribute === 'cname';
-      })[0];
-  if (remoteSsrc) {
-    rtcpParameters.cname = remoteSsrc.value;
-    rtcpParameters.ssrc = remoteSsrc.ssrc;
-  }
-
-  // Edge uses the compound attribute instead of reducedSize
-  // compound is !reducedSize
-  var rsize = SDPUtils.matchPrefix(mediaSection, 'a=rtcp-rsize');
-  rtcpParameters.reducedSize = rsize.length > 0;
-  rtcpParameters.compound = rsize.length === 0;
-
-  // parses the rtcp-mux attrіbute.
-  // Note that Edge does not support unmuxed RTCP.
-  var mux = SDPUtils.matchPrefix(mediaSection, 'a=rtcp-mux');
-  rtcpParameters.mux = mux.length > 0;
-
-  return rtcpParameters;
-};
-
-// parses either a=msid: or a=ssrc:... msid lines and returns
-// the id of the MediaStream and MediaStreamTrack.
-SDPUtils.parseMsid = function(mediaSection) {
-  var parts;
-  var spec = SDPUtils.matchPrefix(mediaSection, 'a=msid:');
-  if (spec.length === 1) {
-    parts = spec[0].substr(7).split(' ');
-    return {stream: parts[0], track: parts[1]};
-  }
-  var planB = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-  .map(function(line) {
-    return SDPUtils.parseSsrcMedia(line);
-  })
-  .filter(function(parts) {
-    return parts.attribute === 'msid';
-  });
-  if (planB.length > 0) {
-    parts = planB[0].value.split(' ');
-    return {stream: parts[0], track: parts[1]};
-  }
-};
-
-// Generate a session ID for SDP.
-// https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-20#section-5.2.1
-// recommends using a cryptographically random +ve 64-bit value
-// but right now this should be acceptable and within the right range
-SDPUtils.generateSessionId = function() {
-  return Math.random().toString().substr(2, 21);
-};
-
-// Write boilder plate for start of SDP
-// sessId argument is optional - if not supplied it will
-// be generated randomly
-// sessVersion is optional and defaults to 2
-SDPUtils.writeSessionBoilerplate = function(sessId, sessVer) {
-  var sessionId;
-  var version = sessVer !== undefined ? sessVer : 2;
-  if (sessId) {
-    sessionId = sessId;
-  } else {
-    sessionId = SDPUtils.generateSessionId();
-  }
-  // FIXME: sess-id should be an NTP timestamp.
-  return 'v=0\r\n' +
-      'o=thisisadapterortc ' + sessionId + ' ' + version + ' IN IP4 127.0.0.1\r\n' +
-      's=-\r\n' +
-      't=0 0\r\n';
-};
-
-SDPUtils.writeMediaSection = function(transceiver, caps, type, stream) {
-  var sdp = SDPUtils.writeRtpDescription(transceiver.kind, caps);
-
-  // Map ICE parameters (ufrag, pwd) to SDP.
-  sdp += SDPUtils.writeIceParameters(
-      transceiver.iceGatherer.getLocalParameters());
-
-  // Map DTLS parameters to SDP.
-  sdp += SDPUtils.writeDtlsParameters(
-      transceiver.dtlsTransport.getLocalParameters(),
-      type === 'offer' ? 'actpass' : 'active');
-
-  sdp += 'a=mid:' + transceiver.mid + '\r\n';
-
-  if (transceiver.direction) {
-    sdp += 'a=' + transceiver.direction + '\r\n';
-  } else if (transceiver.rtpSender && transceiver.rtpReceiver) {
-    sdp += 'a=sendrecv\r\n';
-  } else if (transceiver.rtpSender) {
-    sdp += 'a=sendonly\r\n';
-  } else if (transceiver.rtpReceiver) {
-    sdp += 'a=recvonly\r\n';
-  } else {
-    sdp += 'a=inactive\r\n';
-  }
-
-  if (transceiver.rtpSender) {
-    // spec.
-    var msid = 'msid:' + stream.id + ' ' +
-        transceiver.rtpSender.track.id + '\r\n';
-    sdp += 'a=' + msid;
-
-    // for Chrome.
-    sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
-        ' ' + msid;
-    if (transceiver.sendEncodingParameters[0].rtx) {
-      sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].rtx.ssrc +
-          ' ' + msid;
-      sdp += 'a=ssrc-group:FID ' +
-          transceiver.sendEncodingParameters[0].ssrc + ' ' +
-          transceiver.sendEncodingParameters[0].rtx.ssrc +
-          '\r\n';
-    }
-  }
-  // FIXME: this should be written by writeRtpDescription.
-  sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
-      ' cname:' + SDPUtils.localCName + '\r\n';
-  if (transceiver.rtpSender && transceiver.sendEncodingParameters[0].rtx) {
-    sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].rtx.ssrc +
-        ' cname:' + SDPUtils.localCName + '\r\n';
-  }
-  return sdp;
-};
-
-// Gets the direction from the mediaSection or the sessionpart.
-SDPUtils.getDirection = function(mediaSection, sessionpart) {
-  // Look for sendrecv, sendonly, recvonly, inactive, default to sendrecv.
-  var lines = SDPUtils.splitLines(mediaSection);
-  for (var i = 0; i < lines.length; i++) {
-    switch (lines[i]) {
-      case 'a=sendrecv':
-      case 'a=sendonly':
-      case 'a=recvonly':
-      case 'a=inactive':
-        return lines[i].substr(2);
-      default:
-        // FIXME: What should happen here?
-    }
-  }
-  if (sessionpart) {
-    return SDPUtils.getDirection(sessionpart);
-  }
-  return 'sendrecv';
-};
-
-SDPUtils.getKind = function(mediaSection) {
-  var lines = SDPUtils.splitLines(mediaSection);
-  var mline = lines[0].split(' ');
-  return mline[0].substr(2);
-};
-
-SDPUtils.isRejected = function(mediaSection) {
-  return mediaSection.split(' ', 2)[1] === '0';
-};
-
-SDPUtils.parseMLine = function(mediaSection) {
-  var lines = SDPUtils.splitLines(mediaSection);
-  var mline = lines[0].split(' ');
-  return {
-    kind: mline[0].substr(2),
-    port: parseInt(mline[1], 10),
-    protocol: mline[2],
-    fmt: mline.slice(3).join(' ')
-  };
-};
-
-// Expose public methods.
-if (true) {
-  module.exports = SDPUtils;
-}
-
-
-/***/ }),
-/* 6 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__index_js__ = __webpack_require__(7);
-AFRAME.registerSystem('wevr-auto-start', {
-  init() {
-    var wevr = this.el.systems.wevr;
-    wevr.data.startOnLoad = true;
-    wevr.start();
-  }
-});
-
-
-
-/***/ }),
-/* 7 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Components_js__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__WevrSystem_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_aframe_joysticks_movement_component__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_webrtc_adapter__ = __webpack_require__(22);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_webrtc_adapter___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_webrtc_adapter__);
-
-
-
-
-
-
-
-/***/ }),
-/* 8 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_lodash__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(1);
-
-
-
-
-AFRAME.registerComponent('wevr-avatar', {
-  schema: {type: "string"},
-  init() {
-    this.el.innerHTML = `<a-sphere class="head"
-                          color="#5985ff"
-                          position="0 -0.05 0"
-                          scale="0.25 0.3 0.2">
-
-<a-entity class="face"
-                          position="0 0 -0.6">
-                        <a-sphere position="0 0.05 -0.4"
-                          color="#5985ff"
-                          scale="0.18 0.18 0.18">
-                </a-sphere>
-                    <a-sphere class="eye"
-                              color="#efefef"
-                              position="0.3 0.35 -0.3"
-                              scale="0.15 0.15 0.15"
-                            >
-                        <a-sphere class="pupil"
-                                  color="#000"
-                                  position="0 0 -1"
-                                  scale="0.45 0.45 0.45"
-                                ></a-sphere>
-                    </a-sphere>
-                    <a-sphere class="eye"
-                              color="#efefef"
-                              position="-0.3 0.35 -0.3"
-                              scale="0.15 0.15 0.15"
-                            >
-                        <a-sphere class="pupil"
-                                  color="#000"
-                                  position="0 0 -1"
-                                  scale="0.45 0.45 0.45"
-                                ></a-sphere>
-                    </a-sphere>
-                </a-entity>
-
-                </a-sphere>
-                `;
-    this.system = this.el.sceneEl.systems.wevr;
-
-    var channels = this.system.channels;
-    channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
-      this.system.updateMovement(this.el, event, this);
-    })
-  },
-
-  tick(time, timeDelta) {
-    this.system.makeMovementChanges(this);
-    this.system.positionalAudio.makeAudioPositionChanges(this.data, this.targetPosition);
-  }
-});
-
-AFRAME.registerComponent('wevr-avatar-hand', {
-  schema: {
-    peer: {type: "string"},
-    hand: {type: "string"}
-  },
-  init() {
-    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
-
-    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
-    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#5985ff" radius="0.1"></a-sphere>
-    </a-sphere>`;
-
-    this.system = this.el.sceneEl.systems.wevr;
-    var channels = this.system.channels;
-
-    channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
-      this.system.updateMovement(this.el, event, this);
-    });
-  },
-
-  tick(time, timeDelta) {
-    this.system.makeMovementChanges(this);
-  }
-});
-
-AFRAME.registerComponent('wevr-player', {
-  init() {
-    this.system = this.el.sceneEl.systems.wevr;
-
-    this.setPosition(this.el.parentNode);
-    this.el.object3D.updateMatrixWorld();
-    this.position = this.el.object3D.getWorldPosition();
-    this.quaternion = this.el.object3D.getWorldQuaternion();
-    this.period = this.system.data.period;
-
-    this.system.channels.addEventListener("ready", (data, peer) => {
-      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init movement: " + peer, false);
-
-    });
-  },
-
-  setPosition(el) {
-    var center = {x: 0, y: 0, z: 0};
-    let radius = 3;
-
-    var angleRad = this.getRandomAngleInRadians();
-    var circlePoint = this.randomPointOnCircle(radius, angleRad);
-    var worldPoint = {x: circlePoint.x + center.x, y: center.y, z: circlePoint.y + center.z};
-    el.setAttribute('position', worldPoint);
-
-    var angleDeg = angleRad * 180 / Math.PI;
-    var angleToCenter = -1 * angleDeg + 90;
-    var rotationStr = '0 ' + angleToCenter + ' 0';
-    el.setAttribute('rotation', rotationStr);
-  },
-
-  tick(time, delta) {
-    if (!this.lastSent || time - this.lastSent > this.period) {
-      this.el.object3D.updateMatrixWorld(true);
-      var position = this.el.object3D.getWorldPosition();
-      var quaternion = this.el.object3D.getWorldQuaternion();
-
-      if (!__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.quaternion, quaternion)) {
-        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
-        this.position = position;
-        this.quaternion = quaternion;
-        this.system.positionalAudio.updateListener(this.el.object3D.matrixWorld);
-      }
-      this.lastSent = time;
-    }
-  },
-
-  getRandomAngleInRadians: function () {
-    return Math.random() * Math.PI * 2;
-  },
-
-  randomPointOnCircle: function (radius, angleRad) {
-    let x = Math.cos(angleRad) * radius;
-    let y = Math.sin(angleRad) * radius;
-    return {x: x, y: y};
-  }
-});
-
-
-AFRAME.registerComponent('wevr-player-hand', {
-  schema: {type: "string"},
-  init() {
-    this.system = this.el.sceneEl.systems.wevr;
-
-    this.initializeHands();
-    window.addEventListener("gamepadconnected", () => {
-      this.initializeHands()
-    });
-  },
-
-  initializeHands() {
-    this.hasHand = this.checkHand(this.data);
-    if (this.hasHand) {
-      this.el.setAttribute("visible", "true");
-      this.el.object3D.updateMatrixWorld();
-      this.position = this.el.object3D.getWorldPosition();
-      this.quaternion = this.el.object3D.getWorldQuaternion();
-      this.period = this.system.data.period;
-
-      this.system.channels.addEventListener("ready", (data, peer) => {
-        this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
-          hand: this.data,
-          position: this.position,
-          quaternion: this.quaternion
-        });
-        __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init hand movement: " + this.data + peer, false);
-      });
-
-    } else {
-      this.el.setAttribute("visible", "false");
-    }
-  },
-
-  checkHand(hand) {
-    var gamepads = navigator.getGamepads && navigator.getGamepads();
-    var i = 0;
-    if (gamepads) {
-      for (; i < gamepads.length; i++) {
-        var gamepad = gamepads[i];
-        if (gamepad) {
-          if (gamepad.id.toLowerCase().indexOf(hand) != -1) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  },
-
-  tick(time, delta) {
-    if (this.hasHand) {
-      if (!this.lastSent || time - this.lastSent > this.period) {
-        this.el.object3D.updateMatrixWorld(true);
-        var position = this.el.object3D.getWorldPosition();
-        var quaternion = this.el.object3D.getWorldQuaternion();
-
-        if (!__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.quaternion, quaternion)) {
-          this.system.channels.broadcast("wevr.movement.hands." + this.data, {
-            position: position,
-            quaternion: quaternion
-          });
-          this.position = position;
-          this.quaternion = quaternion;
-        }
-        this.lastSent = time;
-      }
-    }
-  }
-});
-
-
-AFRAME.registerComponent('maybe-cursor', {
-  init() {
-    if (!this.el.sceneEl.is('vr-mode')) {
-      this.addCursor();
-    } else {
-      this.removeCursor();
-    }
-    this.el.sceneEl.addEventListener('enter-vr', () => this.removeCursor());
-    this.el.sceneEl.addEventListener('exit-vr', () => this.addCursor());
-  },
-
-  removeCursor() {
-    this.el.removeAttribute("cursor");
-    this.el.setAttribute("visible", "false");
-  },
-
-  addCursor() {
-    this.el.setAttribute("cursor", "");
-    this.el.setAttribute("visible", "true");
-  }
-});
-
-
-AFRAME.registerComponent('refresh-button', {
-
-  types: {GAMEPAD: 'gamepad', OCULUS: 'oculus-touch', VIVE: 'vive'},
-
-  tick: function () {
-    if (!this.button) {
-      var gamepad = this.getGamepad();
-      if (gamepad) {
-        this.button = gamepad.buttons[0].pressed;
-        if (this.button) {
-          setTimeout(() => {
-            if (this.getGamepad().buttons[0].pressed) {
-              location.reload();
-            }
-            this.button = undefined;
-          }, 1000);
-        }
-      }
-    }
-  },
-
-  checkControllerType: function () {
-    var typeFound = this.types.GAMEPAD;
-    var indexFound = 0;
-    var gamepads = navigator.getGamepads && navigator.getGamepads();
-    var i = 0;
-    if (gamepads) {
-      for (; i < gamepads.length; i++) {
-        var gamepad = gamepads[i];
-        if (gamepad) {
-          if (gamepad.id.indexOf('Oculus Touch') === 0) {
-            typeFound = this.types.OCULUS;
-            indexFound = i;
-            break;
-          }
-          if (gamepad.id.indexOf('OpenVR Gamepad') === 0) {
-            typeFound = this.types.VIVE;
-            indexFound = i;
-            break;
-          }
-          indexFound = i;
-        }
-      }
-      return {index: indexFound, type: typeFound};
-    }
-    return false;
-  },
-
-  getGamepad: function () {
-    var type = this.checkControllerType();
-    return type
-      && navigator.getGamepads()[type.index];
-  }
-});
-
-
-/***/ }),
-/* 9 */
-/***/ (function(module, exports) {
-
-module.exports = function(module) {
-	if(!module.webpackPolyfill) {
-		module.deprecate = function() {};
-		module.paths = [];
-		// module.parent = undefined by default
-		if(!module.children) module.children = [];
-		Object.defineProperty(module, "loaded", {
-			enumerable: true,
-			get: function() {
-				return module.l;
-			}
-		});
-		Object.defineProperty(module, "id", {
-			enumerable: true,
-			get: function() {
-				return module.i;
-			}
-		});
-		module.webpackPolyfill = 1;
-	}
-	return module;
-};
-
-
-/***/ }),
-/* 10 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__ = __webpack_require__(11);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__ = __webpack_require__(13);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser__ = __webpack_require__(15);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_detect_browser__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Utils__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_three__ = __webpack_require__(18);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_8_lodash__);
-
-
-
-
-
-
-
-
-
-
-
-AFRAME.registerSystem('wevr', {
-  schema: {
-    period: {default: 100},
-    signalUrl: {default: 'wss://wevr.vrlobby.co/wevr'},
-    startOnLoad: {default: false}
-  },
-
-  init() {
-    if (this.data.startOnLoad) this.start();
-  },
-
-  start() {
-    this.signaller = new __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__["a" /* default */](this.data.signalUrl);
-    let broker = new __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__["a" /* default */](this.signaller);
-    this.channels = new __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__["a" /* default */](broker);
-    this.stateHandler = new __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__["a" /* default */](this.signaller, this.channels);
-    this.positionalAudio = new __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__["a" /* default */]();
-
-    this.setUpPlayer(this.el.sceneEl);
-
-    this.setUpAudio(broker, this.el);
-
-    this.setUpAvatars(this.channels, this.el.sceneEl);
-
-    this.setUpPeerConnectionChecks(broker, this.channels);
-
-    if (this.el.hasLoaded) {
-      this.signaller.start();
-    } else {
-      this.el.addEventListener("loaded", () => {
-        this.signaller.start();
-      });
-    }
-  },
-
-  setUpPeerConnectionChecks(broker, channels) {
-    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
-    channels.addEventListener("wevr.peer-ping", (param, peer) => {
-      this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
-    });
-    broker.onreconnect = () => {
-      __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("received reconnect. reloading: " + window.wevr.id);
-      location.reload();
-    }
-  },
-
-  checkConnections(peers, broker) {
-    this.pingReplies = [];
-    this.pingRecpients = peers;
-    var self = this;
-    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
-    peers.forEach((peer) => {
-      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
-        self.pingReplies.push(peer);
-      })
-    });
-    this.channels.broadcast("wevr.peer-ping",{});
-    setTimeout(()=> {
-        if (self.pingRecpients.length != self.pingReplies.length) {
-          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
-            __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("no answers, i might be the problem");
-            broker.onreconnect();
-          } else {
-            this.signaller.signal({
-              event: "wevr.peer-ping-failure",
-              data: __WEBPACK_IMPORTED_MODULE_8_lodash___default()(self.pingRecpients, self.pingReplies)
-            })
-          }
-        }
-      }
-      , 30000);
-
-  },
-
-  setUpPlayer(sceneEl) {
-    let element = document.createElement("a-entity");
-    element.setAttribute("id", "player");
-    element.setAttribute("joysticks-movement", "");
-    element.innerHTML =
-      `<a-entity wevr-player refresh-button wasd-controls look-controls camera="userHeight:1.6">
-    <a-entity maybe-cursor
-            visible="false"
-            position="0 0 -1"
-            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
-            material="color: darkgrey; shader: flat"></a-entity>
-    <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
-    </a-entity>
-    <a-entity wevr-player-hand="right" hand-controls="right" cursor="downEvents:triggerdown;upEvents:triggerup" raycaster="showLine:true"></a-entity>
-    <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
-    sceneEl.appendChild(element);
-  },
-
-  setUpAudio(broker, sceneEl) {
-    broker.onaudio = () => {
-      var el = document.getElementById("audioinfo");
-      if (el) {
-        if (broker.audioState == "success") {
-          el.setAttribute("visible", "false");
-        } else {
-          el.setAttribute("text","value",broker.audioState)
-        }
-      }
-    };
-    broker.onpeeraudio = (stream, peer) => {
-      const browser = Object(__WEBPACK_IMPORTED_MODULE_5_detect_browser__["detect"])();
-      switch (browser && browser.name) {
-        case 'chrome':
-          this.useAudioElement(stream, peer, sceneEl);
-          break;
-        default:
-          this.positionalAudio.usePositionalAudio(stream, peer);
-      }
-    };
-  },
-
-  useAudioElement(stream, peer, el) {
-    let element = document.createElement("audio");
-    this.findPeerElement(peer, el).appendChild(element);
-    element.autoplay = true;
-    element.srcObject = stream;
-    element.play();
-  },
-
-  setUpAvatars(channels, sceneEl) {
-    channels.addEventListener("open", (data, peer) => {
-      let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
-
-      channels.addEventListenerForPeer(peer, "wevr.movement-init", (event) => {
-        element.object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
-        element.object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
-        element.setAttribute("visible", "true");
-      });
-
-      channels.addEventListenerForPeer(peer, `wevr.movement-init.hand`, (event) => {
-        let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar-hand", `peer:${peer};hand:${event.hand}`);
-        var object3D = element.object3D;
-        object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
-        object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
-        element.setAttribute("visible", "true");
-      });
-    });
-  },
-
-  createAvatarElement(peer, sceneEl, componentName, value) {
-    let element = document.createElement("a-entity");
-    element.setAttribute(componentName, value);
-    element.setAttribute("visible", "false");
-    this.findPeerElement(peer, sceneEl).appendChild(element);
-    return element;
-  },
-
-  findPeerElement(peer, sceneEl) {
-    let element = document.getElementById(peer);
-    if (!element) {
-      element = document.createElement("a-entity");
-      element.setAttribute("id", peer);
-      sceneEl.appendChild(element);
-    }
-    return element;
-  },
-
-  updateMovement(element, event, component) {
-    component.targetPosition = new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z);
-    component.startPosition = element.object3D.position.clone();
-    component.targetRotation = new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w);
-    component.timeUpdated = Date.now();
-  },
-
-  makeMovementChanges(source) {
-    if (source.timeUpdated) {
-      let progress = (Date.now() - source.timeUpdated) / this.period;
-      if (progress < 1) {
-        if (source.targetPosition) {
-          source.el.object3D.position.lerpVectors(source.startPosition, source.targetPosition, progress);
-
-        }
-        if (source.targetRotation) {
-          source.el.object3D.quaternion.slerp(source.targetRotation, progress);
-        }
-      } else {
-        if (source.targetPosition) {
-          source.el.object3D.position.copy(source.targetPosition);
-        }
-        if (source.targetRotation) {
-          source.el.object3D.quaternion.copy(source.targetRotation);
-        }
-        source.timeUpdated = undefined;
-      }
-    }
-  }
-});
-
-/***/ }),
-/* 11 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(1);
-
-
-class SignallingClient {
-
-  constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
-    this.host = host;
-    this.roomId = roomId;
-    this.secondsTilRetry = 2;
-    this.listeners = {};
-  }
-
-  start() {
-    if (this.ws) {
-      this.close();
-    }
-    this.ws = this.connect(this.host, this.roomId);
-  }
-
-  close() {
-    if (this.ws) {
-      this.ws.close();
-    }
-  }
-
-  connect(host, roomId) {
-    let ws = new WebSocket(`${host}/${roomId}`);
-    ws.onclose = () => {
-      if (this.secondsTilRetry < 33) {
-        this.secondsTilRetry = this.secondsTilRetry * 2;
-        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
-        setTimeout(() => {
-          try {
-            this.start();
-          } catch (e) {
-            __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(e);
-          }
-        }, 1000 * this.secondsTilRetry);
-      } else {
-        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws closed! - giving up");
-      }
-    };
-
-    ws.onopen = () => {
-      this.secondsTilRetry = 2;
-      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws opened");
-    };
-
-    ws.onerror = (error) => {
-      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(error);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        var msg = JSON.parse(event.data);
-        if (msg.event != "wevr.ping") {
-          __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws received: " + event.data);
-        }
-        this.dispatch(msg);
-      } catch (e) {
-        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(e);
-      }
-    };
-    return ws;
-  }
-
-  addEventListener(type, listener) {
-    if (!(type in this.listeners)) {
-      this.listeners[type] = [];
-    }
-    this.listeners[type].push(listener);
-  }
-
-  dispatch(msg) {
-    var type = msg.event;
-    var param = msg.data;
-    if (!(type in this.listeners)) {
-      return true;
-    }
-    var stack = this.listeners[type];
-    stack.forEach( (element) => {
-      element.call(this, param);
-      });
-  }
-
-  signal(msg) {
-    let msgString = JSON.stringify(msg);
-    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("signaling: " + msgString);
-    this.ws.send(msgString);
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = SignallingClient;
-
-
-/***/ }),
-/* 12 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__DataChannels_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(1);
-
-
-
-class RTCConnectionBroker {
-
-  constructor(signallingClient) {
-
-    this.iceConfiguration = {
-      iceServers: [{
-        urls: [
-          "stun:stun.l.google.com:19302"
-        ]
-      }, {
-        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
-        credential: "noone",
-        username: "none"
-      }]
-    };
-
-    let constraints = {audio: true, video: false};
-    var self = this;
-    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
-      self.audioState = 'success';
-      self.onaudio();
-      return audio;
-    }).catch((e) => {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(e);
-      self.audioState = 'mute';
-      self.onaudio();
-    });
-    this.audioState = 'requesting';
-    this.signallingClient = signallingClient;
-    this.connections = {};
-    this.candidates = {}
-    this.listen("wevr.connect", (data) => {
-      this.connectTo(data);
-    });
-    this.listen("wevr.offer", (data) => {
-      this.acceptOffer(data);
-    });
-    this.listen("wevr.answer", (data) => {
-      this.acceptAnswer(data);
-    });
-    this.listen("wevr.ice-candidate", (data) => {
-      this.acceptIceCandidate(data);
-    });
-    this.listen("wevr.leftgame", (data) => {
-      this.leftgame(data);
-    });
-    this.listen("wevr.check-connections", (data) => {
-      this.checkConnections(data);
-    });
-    this.listen("wevr.reconnect", () => {
-      this.reconnect();
-    });
-    this.listen("wevr.id", (data) => {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].info(`I am ${data}`);
-      window.wevr.id = data;
-    });
-  }
-
-  listen(event, listener) {
-    this.signallingClient.addEventListener(event, listener);
-  }
-
-  connectTo(recipient) {
-    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].info(`gonna connect to ${recipient}`);
-    let connection = new RTCPeerConnection(this.iceConfiguration);
-    this.connections[recipient] = connection;
-
-    this.setUpConnection(connection, recipient).then(() => {
-      this.createOfferAndSignal(connection, recipient);
-    });
-  }
-
-  setUpConnection(connection, peer) {
-    var self = this;
-    connection.oniceconnectionstatechange = (e) => {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} state changed to ${connection.iceConnectionState}`, true);
-      if (connection.iceConnectionState == 'failed') {
-        self.signaller.signal({
-          event: "wevr.peer-ping-failure",
-          data: [peer]
-        })
-      }
-    };
-    connection.onnegotiationneeded = (e) => {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} negotiation needed`, true);
-    };
-    this.handleIceCandidates(connection, peer);
-    return this.addAudio(connection, peer);
-  }
-
-  createOfferAndSignal(connection, recipient) {
-    var channel = connection.createDataChannel("data");
-    channel.onopen = (event) => {
-      this.onchannel(recipient, channel);
-    };
-
-    connection.createOffer().then((offer) => {
-      connection.setLocalDescription(offer);
-      this.signallingClient.signal({
-        event: "wevr.offer",
-        data: {to: recipient, payload: offer}
-      });
-    });
-  }
-
-  handleIceCandidates(connection, peer) {
-    this.candidates[peer] = [];
-    connection.onicecandidate = (event) => {
-      if (event.candidate) {
-        if (this.sending) {
-          this.signalCandidate(peer, event.candidate);
-        } else {
-          this.candidates[peer].push(event.candidate);
-        }
-      }
-    };
-  }
-
-  signalCandidate(peer, candidate) {
-    this.signallingClient.signal({
-      event: "wevr.ice-candidate",
-      data: {to: peer, payload: candidate}
-    });
-  }
-
-  addAudio(connection, peer) {
-    connection.ontrack = (e) => {
-      this.onpeeraudio(e.streams[0], peer);
-    };
-    return this.audio.then((stream) => {
-      if (stream) {
-        stream.getTracks().forEach(track => {
-          connection.addTrack(track, stream);
-        });
-      }
-    }).catch(function (err) {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(err);
-    });
-
-  }
-
-  acceptOffer(data) {
-    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting offer from ${data.from}`);
-    let connection = new RTCPeerConnection(this.iceConfiguration);
-    connection.ondatachannel = (event) => {
-      event.channel.onopen = () => {
-        this.onchannel(data.from, event.channel);
-      };
-    };
-    this.connections[data.from] = connection;
-    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
-
-    this.setUpConnection(connection, data.from).then(() => {
-      this.createAnswerAndSignal(connection, data.from);
-    });
-  }
-
-  acceptAnswer(data) {
-    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting answer from ${data.from}`);
-    let connection = this.connections[data.from];
-    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
-    this.sendCachedCandidates(data.from);
-  }
-
-  sendCachedCandidates(peer) {
-    this.candidates[peer].forEach((candidate) => {
-      this.signalCandidate(peer, candidate);
-    });
-    this.sending = true;
-  }
-
-  createAnswerAndSignal(connection, sender) {
-    connection.createAnswer().then((answer) => {
-      connection.setLocalDescription(answer);
-      this.signallingClient.signal({
-        event: "wevr.answer",
-        data: {to: sender, payload: answer}
-      });
-    });
-  }
-
-  acceptIceCandidate(data) {
-    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting ice-candidate from ${data.from}`);
-    let connection = this.connections[data.from];
-    connection.addIceCandidate(new RTCIceCandidate(data.payload));
-    if (!this.sending) {
-      this.sendCachedCandidates(data.from);
-    }
-  }
-
-  leftgame(peer) {
-    if (this.connections[peer]) {
-      this.connections[peer].close();
-      delete this.connections[peer];
-    }
-    var element = document.getElementById(peer);
-    if (element) {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`removing ${peer}`, true);
-      element.parentNode.removeChild(element);
-    }
-  }
-
-  checkConnections(peers) {
-    this.oncheckconnections(peers);
-  }
-
-  reconnect() {
-    this.onreconnect();
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = RTCConnectionBroker;
-
-
-/***/ }),
-/* 13 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-class StateHandler {
-  constructor(signaller, dataChannels) {
-    this.signaller = signaller;
-    this.dataChannels = dataChannels;
-    this.listeners = {};
-    this.signaller.addEventListener("wevr.state", (data) => {
-      this.dispatch(data);
-    });
-    this.dataChannels.addEventListener("wevr.state", (data) => {
-      this.dispatch(data);
-    });
-  }
-
-  updateState(key, data) {
-    this.signaller.signal({event: "wevr.state", data: {key, data}});
-    this.dataChannels.broadcast("wevr.state", {key, data});
-  }
-
-  addStateListener(type, listener) {
-    if (!(type in this.listeners)) {
-      this.listeners[type] = [];
-    }
-    this.listeners[type].push(listener);
-  }
-
-  dispatch(msg) {
-    var type = msg.key;
-    var param = msg.data;
-    if (!(type in this.listeners)) {
-      return true;
-    }
-    var stack = this.listeners[type];
-    stack.forEach( (element) => {
-      element.call(this, param);
-    });
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = StateHandler;
-
-
-/***/ }),
-/* 14 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-class PositionalAudio {
-
-  constructor() {
-    this.panners = {};
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  updateListener(matrix) {
-
-    var p = new THREE.Vector3();
-    p.setFromMatrixPosition(matrix);
-
-    this.audioCtx.listener.setPosition(p.x, p.y, p.z);
-
-    var mx = matrix.elements[12], my = matrix.elements[13], mz = matrix.elements[14];
-    matrix.elements[12] = matrix.elements[13] = matrix.elements[14] = 0;
-
-// Multiply the orientation vector by the world matrix of the camera.
-    var vec = new THREE.Vector3(0,0,1);
-    vec.applyMatrix4(matrix);
-    vec.normalize();
-
-// Multiply the up vector by the world matrix.
-    var up = new THREE.Vector3(0,-1,0);
-    up.applyMatrix4(matrix);
-    up.normalize();
-
-// Set the orientation and the up-vector for the listener.
-    this.audioCtx.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
-
-    matrix.elements[12] = mx;
-    matrix.elements[13] = my;
-    matrix.elements[14] = mz;
-  }
-
-  usePositionalAudio(track, peer) {
-    let source = this.audioCtx.createMediaStreamSource(track);
-    let panner = this.audioCtx.createPanner();
-    source.connect(panner);
-    panner.connect(this.audioCtx.destination);
-    this.panners[peer] = panner;
-  }
-
-  makeAudioPositionChanges(peer, position) {
-    let positionalAudio = this.panners[peer];
-    if (positionalAudio && position) {
-      this.setPannerPosition(positionalAudio, position);
-    }
-  }
-
-  setPannerPosition(panner, position) {
-    if (panner.positionX) {
-      panner.positionX.value = position.x;
-      panner.positionY.value = position.y;
-      panner.positionZ.value = position.z;
-    } else {
-      panner.setPosition(position.x, position.y, position.z);
-    }
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = PositionalAudio;
-
-
-/***/ }),
-/* 15 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(process) {/**
-  # detect-browser
-
-  This is a package that attempts to detect a browser vendor and version (in
-  a semver compatible format) using a navigator useragent in a browser or
-  `process.version` in node.
-
-  ## NOTE: Version 2.x release
-
-  Release 2.0 introduces a breaking API change (hence the major release)
-  which requires invocation of a `detect` function rather than just inclusion of
-  the module.  PR [#46](https://github.com/DamonOehlman/detect-browser/pull/46)
-  provides more context as to why this change has been made.
-
-  ## Example Usage
-
-  <<< examples/simple.js
-
-  Or you can use a switch statement:
-
-  <<< examples/switch.js
-
-  ## Adding additional browser support
-
-  The current list of browsers that can be detected by `detect-browser` is
-  not exhaustive. If you have a browser that you would like to add support for
-  then please submit a pull request with the implementation.
-
-  Creating an acceptable implementation requires two things:
-
-  1. A test demonstrating that the regular expression you have defined identifies
-     your new browser correctly.  Examples of this can be found in the 
-     `test/logic.js` file.
-
-  2. Write the actual regex to the `lib/detectBrowser.js` file. In most cases adding
-     the regex to the list of existing regexes will be suitable (if usage of `detect-brower`
-     returns `undefined` for instance), but in some cases you might have to add it before
-     an existing regex.  This would be true for a case where you have a browser that
-     is a specialised variant of an existing browser but is identified as the
-     non-specialised case.
-
-  When writing the regular expression remember that you would write it containing a
-  single [capturing group](https://regexone.com/lesson/capturing_groups) which
-  captures the version number of the browser.
-
-**/
-
-function detect() {
-  var nodeVersion = getNodeVersion();
-  if (nodeVersion) {
-    return nodeVersion;
-  } else if (typeof navigator !== 'undefined') {
-    return parseUserAgent(navigator.userAgent);
-  }
-
-  return null;
-}
-
-function detectOS(userAgentString) {
-  var rules = getOperatingSystemRules();
-  var detected = rules.filter(function (os) {
-    return os.rule && os.rule.test(userAgentString);
-  })[0];
-
-  return detected ? detected.name : null;
-}
-
-function getNodeVersion() {
-  var isNode = typeof navigator === 'undefined' && typeof process !== 'undefined';
-  return isNode ? {
-    name: 'node',
-    version: process.version.slice(1),
-    os: __webpack_require__(17).type().toLowerCase()
-  } : null;
-}
-
-function parseUserAgent(userAgentString) {
-  var browsers = getBrowserRules();
-  if (!userAgentString) {
-    return null;
-  }
-
-  var detected = browsers.map(function(browser) {
-    var match = browser.rule.exec(userAgentString);
-    var version = match && match[1].split(/[._]/).slice(0,3);
-
-    if (version && version.length < 3) {
-      version = version.concat(version.length == 1 ? [0, 0] : [0]);
-    }
-
-    return match && {
-      name: browser.name,
-      version: version.join('.')
-    };
-  }).filter(Boolean)[0] || null;
-
-  if (detected) {
-    detected.os = detectOS(userAgentString);
-  }
-
-  return detected;
-}
-
-function getBrowserRules() {
-  return buildRules([
-    [ 'edge', /Edge\/([0-9\._]+)/ ],
-    [ 'yandexbrowser', /YaBrowser\/([0-9\._]+)/ ],
-    [ 'vivaldi', /Vivaldi\/([0-9\.]+)/ ],
-    [ 'kakaotalk', /KAKAOTALK\s([0-9\.]+)/ ],
-    [ 'chrome', /(?!Chrom.*OPR)Chrom(?:e|ium)\/([0-9\.]+)(:?\s|$)/ ],
-    [ 'phantomjs', /PhantomJS\/([0-9\.]+)(:?\s|$)/ ],
-    [ 'crios', /CriOS\/([0-9\.]+)(:?\s|$)/ ],
-    [ 'firefox', /Firefox\/([0-9\.]+)(?:\s|$)/ ],
-    [ 'fxios', /FxiOS\/([0-9\.]+)/ ],
-    [ 'opera', /Opera\/([0-9\.]+)(?:\s|$)/ ],
-    [ 'opera', /OPR\/([0-9\.]+)(:?\s|$)$/ ],
-    [ 'ie', /Trident\/7\.0.*rv\:([0-9\.]+).*\).*Gecko$/ ],
-    [ 'ie', /MSIE\s([0-9\.]+);.*Trident\/[4-7].0/ ],
-    [ 'ie', /MSIE\s(7\.0)/ ],
-    [ 'bb10', /BB10;\sTouch.*Version\/([0-9\.]+)/ ],
-    [ 'android', /Android\s([0-9\.]+)/ ],
-    [ 'ios', /Version\/([0-9\._]+).*Mobile.*Safari.*/ ],
-    [ 'safari', /Version\/([0-9\._]+).*Safari/ ]
-  ]);
-}
-
-function getOperatingSystemRules() {
-  return buildRules([
-    [ 'iOS', /iP(hone|od|ad)/ ],
-    [ 'Android OS', /Android/ ],
-    [ 'BlackBerry OS', /BlackBerry|BB10/ ],
-    [ 'Windows Mobile', /IEMobile/ ],
-    [ 'Amazon OS', /Kindle/ ],
-    [ 'Windows 3.11', /Win16/ ],
-    [ 'Windows 95', /(Windows 95)|(Win95)|(Windows_95)/ ],
-    [ 'Windows 98', /(Windows 98)|(Win98)/ ],
-    [ 'Windows 2000', /(Windows NT 5.0)|(Windows 2000)/ ],
-    [ 'Windows XP', /(Windows NT 5.1)|(Windows XP)/ ],
-    [ 'Windows Server 2003', /(Windows NT 5.2)/ ],
-    [ 'Windows Vista', /(Windows NT 6.0)/ ],
-    [ 'Windows 7', /(Windows NT 6.1)/ ],
-    [ 'Windows 8', /(Windows NT 6.2)/ ],
-    [ 'Windows 8.1', /(Windows NT 6.3)/ ],
-    [ 'Windows 10', /(Windows NT 10.0)/ ],
-    [ 'Windows ME', /Windows ME/ ],
-    [ 'Open BSD', /OpenBSD/ ],
-    [ 'Sun OS', /SunOS/ ],
-    [ 'Linux', /(Linux)|(X11)/ ],
-    [ 'Mac OS', /(Mac_PowerPC)|(Macintosh)/ ],
-    [ 'QNX', /QNX/ ],
-    [ 'BeOS', /BeOS/ ],
-    [ 'OS/2', /OS\/2/ ],
-    [ 'Search Bot', /(nuhk)|(Googlebot)|(Yammybot)|(Openbot)|(Slurp)|(MSNBot)|(Ask Jeeves\/Teoma)|(ia_archiver)/ ]
-  ]);
-}
-
-function buildRules(ruleTuples) {
-  return ruleTuples.map(function(tuple) {
-    return {
-      name: tuple[0],
-      rule: tuple[1]
-    };
-  });
-}
-
-module.exports = {
-  detect: detect,
-  detectOS: detectOS,
-  getNodeVersion: getNodeVersion,
-  parseUserAgent: parseUserAgent
-};
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(16)))
-
-/***/ }),
-/* 16 */
-/***/ (function(module, exports) {
-
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-
-/***/ }),
-/* 17 */
-/***/ (function(module, exports) {
-
-exports.endianness = function () { return 'LE' };
-
-exports.hostname = function () {
-    if (typeof location !== 'undefined') {
-        return location.hostname
-    }
-    else return '';
-};
-
-exports.loadavg = function () { return [] };
-
-exports.uptime = function () { return 0 };
-
-exports.freemem = function () {
-    return Number.MAX_VALUE;
-};
-
-exports.totalmem = function () {
-    return Number.MAX_VALUE;
-};
-
-exports.cpus = function () { return [] };
-
-exports.type = function () { return 'Browser' };
-
-exports.release = function () {
-    if (typeof navigator !== 'undefined') {
-        return navigator.appVersion;
-    }
-    return '';
-};
-
-exports.networkInterfaces
-= exports.getNetworkInterfaces
-= function () { return {} };
-
-exports.arch = function () { return 'javascript' };
-
-exports.platform = function () { return 'browser' };
-
-exports.tmpdir = exports.tmpDir = function () {
-    return '/tmp';
-};
-
-exports.EOL = '\n';
-
-
-/***/ }),
-/* 18 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -63844,6 +61626,2251 @@ function CanvasRenderer() {
 
 
 /***/ }),
+/* 5 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(1);
+
+
+
+class DataChannels {
+
+  constructor(broker) {
+    this.channels = {};
+    this.listeners = {};
+    this.peerListeners = {};
+    this.ready = {};
+    broker.onchannel = (peer, dataChannel) => {
+      this.addChannel(peer, dataChannel);
+    };
+  }
+
+  addChannel(peer, dataChannel) {
+    this.channels[peer] = dataChannel;
+    this.registerChannelHandlers(dataChannel, peer);
+    this.dispatch({event: "open"},peer);
+    dataChannel.send(JSON.stringify({event: "ready"}));
+  }
+
+  registerChannelHandlers(channel, peer) {
+    let handler = (event) => {
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug(`data channel ${peer}: `+JSON.stringify(event), true);
+    };
+    channel.onmessage = (event) => {this.messageHandler(event, peer)}; //without wrapping arrow function, 'this' in method is the RTCDataChannel obj
+    channel.onclose = handler;
+    channel.onerror = handler;
+  }
+
+  messageHandler(event, peer) {
+    var msg = JSON.parse(event.data);
+    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].trace(peer+" data channel received: " + event.data);
+    if (msg.event === "ready"){
+      this.ready[peer] = true;
+    }
+    this.dispatch(msg, peer);
+  }
+
+  addEventListenerForPeer(peer, type, listener) {
+    if (!(peer in this.peerListeners)) {
+      this.peerListeners[peer] = {};
+    }
+    if (!(type in this.peerListeners[peer])) {
+      this.peerListeners[peer][type] = [];
+    }
+    this.peerListeners[peer][type].push(listener);
+    if (type === "ready" && this.ready[peer]) {
+      this.dispatch({event: "ready"}, peer);
+    }
+  }
+
+  removeAllPeerListeners(type) {
+    Object.keys(this.peerListeners).forEach( (key) => {
+      delete this.peerListeners[key][type];
+    })
+  }
+
+  addEventListener(type, listener) {
+    if (!(type in this.listeners)) {
+      this.listeners[type] = [];
+    }
+    this.listeners[type].push(listener);
+    if (type === "ready") {
+      Object.keys(this.ready).forEach((key)=>{
+        this.dispatch({event: "ready"}, key);
+    });
+    }
+  }
+
+  sendTo(peer, event, data) {
+      let channel = this.channels[peer];
+      if (channel.readyState === "open") {
+        channel.send(JSON.stringify({event, data}));
+      } else {
+        channel.onopen = () => {
+          channel.send(JSON.stringify({event, data}));
+        }
+      }
+  }
+
+  broadcast(event, data) {
+    Object.keys(this.channels).forEach((peer) => {
+      let channel = this.channels[peer];
+      if (channel.readyState === "open") {
+        channel.send(JSON.stringify({event, data}));
+      } else {
+        channel.onopen = () => {
+          channel.send(JSON.stringify({event, data}));
+        }
+      }
+    });
+  }
+
+  dispatch(msg, peer) {
+    var type = msg.event;
+    var param = msg.data;
+    if (type in this.listeners) {
+      var stack = this.listeners[type];
+      stack.forEach((element) => {
+        element(param, peer);
+      });
+    }
+
+    if (peer in this.peerListeners && type in this.peerListeners[peer]) {
+      stack = this.peerListeners[peer][type];
+      stack.forEach((element) => {
+        element(param, peer);
+      });
+    }
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = DataChannels;
+
+
+/***/ }),
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+ /* eslint-env node */
+
+
+// SDP helpers.
+var SDPUtils = {};
+
+// Generate an alphanumeric identifier for cname or mids.
+// TODO: use UUIDs instead? https://gist.github.com/jed/982883
+SDPUtils.generateIdentifier = function() {
+  return Math.random().toString(36).substr(2, 10);
+};
+
+// The RTCP CNAME used by all peerconnections from the same JS.
+SDPUtils.localCName = SDPUtils.generateIdentifier();
+
+// Splits SDP into lines, dealing with both CRLF and LF.
+SDPUtils.splitLines = function(blob) {
+  return blob.trim().split('\n').map(function(line) {
+    return line.trim();
+  });
+};
+// Splits SDP into sessionpart and mediasections. Ensures CRLF.
+SDPUtils.splitSections = function(blob) {
+  var parts = blob.split('\nm=');
+  return parts.map(function(part, index) {
+    return (index > 0 ? 'm=' + part : part).trim() + '\r\n';
+  });
+};
+
+// Returns lines that start with a certain prefix.
+SDPUtils.matchPrefix = function(blob, prefix) {
+  return SDPUtils.splitLines(blob).filter(function(line) {
+    return line.indexOf(prefix) === 0;
+  });
+};
+
+// Parses an ICE candidate line. Sample input:
+// candidate:702786350 2 udp 41819902 8.8.8.8 60769 typ relay raddr 8.8.8.8
+// rport 55996"
+SDPUtils.parseCandidate = function(line) {
+  var parts;
+  // Parse both variants.
+  if (line.indexOf('a=candidate:') === 0) {
+    parts = line.substring(12).split(' ');
+  } else {
+    parts = line.substring(10).split(' ');
+  }
+
+  var candidate = {
+    foundation: parts[0],
+    component: parseInt(parts[1], 10),
+    protocol: parts[2].toLowerCase(),
+    priority: parseInt(parts[3], 10),
+    ip: parts[4],
+    port: parseInt(parts[5], 10),
+    // skip parts[6] == 'typ'
+    type: parts[7]
+  };
+
+  for (var i = 8; i < parts.length; i += 2) {
+    switch (parts[i]) {
+      case 'raddr':
+        candidate.relatedAddress = parts[i + 1];
+        break;
+      case 'rport':
+        candidate.relatedPort = parseInt(parts[i + 1], 10);
+        break;
+      case 'tcptype':
+        candidate.tcpType = parts[i + 1];
+        break;
+      case 'ufrag':
+        candidate.ufrag = parts[i + 1]; // for backward compability.
+        candidate.usernameFragment = parts[i + 1];
+        break;
+      default: // extension handling, in particular ufrag
+        candidate[parts[i]] = parts[i + 1];
+        break;
+    }
+  }
+  return candidate;
+};
+
+// Translates a candidate object into SDP candidate attribute.
+SDPUtils.writeCandidate = function(candidate) {
+  var sdp = [];
+  sdp.push(candidate.foundation);
+  sdp.push(candidate.component);
+  sdp.push(candidate.protocol.toUpperCase());
+  sdp.push(candidate.priority);
+  sdp.push(candidate.ip);
+  sdp.push(candidate.port);
+
+  var type = candidate.type;
+  sdp.push('typ');
+  sdp.push(type);
+  if (type !== 'host' && candidate.relatedAddress &&
+      candidate.relatedPort) {
+    sdp.push('raddr');
+    sdp.push(candidate.relatedAddress); // was: relAddr
+    sdp.push('rport');
+    sdp.push(candidate.relatedPort); // was: relPort
+  }
+  if (candidate.tcpType && candidate.protocol.toLowerCase() === 'tcp') {
+    sdp.push('tcptype');
+    sdp.push(candidate.tcpType);
+  }
+  if (candidate.ufrag) {
+    sdp.push('ufrag');
+    sdp.push(candidate.ufrag);
+  }
+  return 'candidate:' + sdp.join(' ');
+};
+
+// Parses an ice-options line, returns an array of option tags.
+// a=ice-options:foo bar
+SDPUtils.parseIceOptions = function(line) {
+  return line.substr(14).split(' ');
+}
+
+// Parses an rtpmap line, returns RTCRtpCoddecParameters. Sample input:
+// a=rtpmap:111 opus/48000/2
+SDPUtils.parseRtpMap = function(line) {
+  var parts = line.substr(9).split(' ');
+  var parsed = {
+    payloadType: parseInt(parts.shift(), 10) // was: id
+  };
+
+  parts = parts[0].split('/');
+
+  parsed.name = parts[0];
+  parsed.clockRate = parseInt(parts[1], 10); // was: clockrate
+  // was: channels
+  parsed.numChannels = parts.length === 3 ? parseInt(parts[2], 10) : 1;
+  return parsed;
+};
+
+// Generate an a=rtpmap line from RTCRtpCodecCapability or
+// RTCRtpCodecParameters.
+SDPUtils.writeRtpMap = function(codec) {
+  var pt = codec.payloadType;
+  if (codec.preferredPayloadType !== undefined) {
+    pt = codec.preferredPayloadType;
+  }
+  return 'a=rtpmap:' + pt + ' ' + codec.name + '/' + codec.clockRate +
+      (codec.numChannels !== 1 ? '/' + codec.numChannels : '') + '\r\n';
+};
+
+// Parses an a=extmap line (headerextension from RFC 5285). Sample input:
+// a=extmap:2 urn:ietf:params:rtp-hdrext:toffset
+// a=extmap:2/sendonly urn:ietf:params:rtp-hdrext:toffset
+SDPUtils.parseExtmap = function(line) {
+  var parts = line.substr(9).split(' ');
+  return {
+    id: parseInt(parts[0], 10),
+    direction: parts[0].indexOf('/') > 0 ? parts[0].split('/')[1] : 'sendrecv',
+    uri: parts[1]
+  };
+};
+
+// Generates a=extmap line from RTCRtpHeaderExtensionParameters or
+// RTCRtpHeaderExtension.
+SDPUtils.writeExtmap = function(headerExtension) {
+  return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
+      (headerExtension.direction && headerExtension.direction !== 'sendrecv'
+          ? '/' + headerExtension.direction
+          : '') +
+      ' ' + headerExtension.uri + '\r\n';
+};
+
+// Parses an ftmp line, returns dictionary. Sample input:
+// a=fmtp:96 vbr=on;cng=on
+// Also deals with vbr=on; cng=on
+SDPUtils.parseFmtp = function(line) {
+  var parsed = {};
+  var kv;
+  var parts = line.substr(line.indexOf(' ') + 1).split(';');
+  for (var j = 0; j < parts.length; j++) {
+    kv = parts[j].trim().split('=');
+    parsed[kv[0].trim()] = kv[1];
+  }
+  return parsed;
+};
+
+// Generates an a=ftmp line from RTCRtpCodecCapability or RTCRtpCodecParameters.
+SDPUtils.writeFmtp = function(codec) {
+  var line = '';
+  var pt = codec.payloadType;
+  if (codec.preferredPayloadType !== undefined) {
+    pt = codec.preferredPayloadType;
+  }
+  if (codec.parameters && Object.keys(codec.parameters).length) {
+    var params = [];
+    Object.keys(codec.parameters).forEach(function(param) {
+      params.push(param + '=' + codec.parameters[param]);
+    });
+    line += 'a=fmtp:' + pt + ' ' + params.join(';') + '\r\n';
+  }
+  return line;
+};
+
+// Parses an rtcp-fb line, returns RTCPRtcpFeedback object. Sample input:
+// a=rtcp-fb:98 nack rpsi
+SDPUtils.parseRtcpFb = function(line) {
+  var parts = line.substr(line.indexOf(' ') + 1).split(' ');
+  return {
+    type: parts.shift(),
+    parameter: parts.join(' ')
+  };
+};
+// Generate a=rtcp-fb lines from RTCRtpCodecCapability or RTCRtpCodecParameters.
+SDPUtils.writeRtcpFb = function(codec) {
+  var lines = '';
+  var pt = codec.payloadType;
+  if (codec.preferredPayloadType !== undefined) {
+    pt = codec.preferredPayloadType;
+  }
+  if (codec.rtcpFeedback && codec.rtcpFeedback.length) {
+    // FIXME: special handling for trr-int?
+    codec.rtcpFeedback.forEach(function(fb) {
+      lines += 'a=rtcp-fb:' + pt + ' ' + fb.type +
+      (fb.parameter && fb.parameter.length ? ' ' + fb.parameter : '') +
+          '\r\n';
+    });
+  }
+  return lines;
+};
+
+// Parses an RFC 5576 ssrc media attribute. Sample input:
+// a=ssrc:3735928559 cname:something
+SDPUtils.parseSsrcMedia = function(line) {
+  var sp = line.indexOf(' ');
+  var parts = {
+    ssrc: parseInt(line.substr(7, sp - 7), 10)
+  };
+  var colon = line.indexOf(':', sp);
+  if (colon > -1) {
+    parts.attribute = line.substr(sp + 1, colon - sp - 1);
+    parts.value = line.substr(colon + 1);
+  } else {
+    parts.attribute = line.substr(sp + 1);
+  }
+  return parts;
+};
+
+// Extracts the MID (RFC 5888) from a media section.
+// returns the MID or undefined if no mid line was found.
+SDPUtils.getMid = function(mediaSection) {
+  var mid = SDPUtils.matchPrefix(mediaSection, 'a=mid:')[0];
+  if (mid) {
+    return mid.substr(6);
+  }
+}
+
+SDPUtils.parseFingerprint = function(line) {
+  var parts = line.substr(14).split(' ');
+  return {
+    algorithm: parts[0].toLowerCase(), // algorithm is case-sensitive in Edge.
+    value: parts[1]
+  };
+};
+
+// Extracts DTLS parameters from SDP media section or sessionpart.
+// FIXME: for consistency with other functions this should only
+//   get the fingerprint line as input. See also getIceParameters.
+SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
+  var lines = SDPUtils.matchPrefix(mediaSection + sessionpart,
+      'a=fingerprint:');
+  // Note: a=setup line is ignored since we use the 'auto' role.
+  // Note2: 'algorithm' is not case sensitive except in Edge.
+  return {
+    role: 'auto',
+    fingerprints: lines.map(SDPUtils.parseFingerprint)
+  };
+};
+
+// Serializes DTLS parameters to SDP.
+SDPUtils.writeDtlsParameters = function(params, setupType) {
+  var sdp = 'a=setup:' + setupType + '\r\n';
+  params.fingerprints.forEach(function(fp) {
+    sdp += 'a=fingerprint:' + fp.algorithm + ' ' + fp.value + '\r\n';
+  });
+  return sdp;
+};
+// Parses ICE information from SDP media section or sessionpart.
+// FIXME: for consistency with other functions this should only
+//   get the ice-ufrag and ice-pwd lines as input.
+SDPUtils.getIceParameters = function(mediaSection, sessionpart) {
+  var lines = SDPUtils.splitLines(mediaSection);
+  // Search in session part, too.
+  lines = lines.concat(SDPUtils.splitLines(sessionpart));
+  var iceParameters = {
+    usernameFragment: lines.filter(function(line) {
+      return line.indexOf('a=ice-ufrag:') === 0;
+    })[0].substr(12),
+    password: lines.filter(function(line) {
+      return line.indexOf('a=ice-pwd:') === 0;
+    })[0].substr(10)
+  };
+  return iceParameters;
+};
+
+// Serializes ICE parameters to SDP.
+SDPUtils.writeIceParameters = function(params) {
+  return 'a=ice-ufrag:' + params.usernameFragment + '\r\n' +
+      'a=ice-pwd:' + params.password + '\r\n';
+};
+
+// Parses the SDP media section and returns RTCRtpParameters.
+SDPUtils.parseRtpParameters = function(mediaSection) {
+  var description = {
+    codecs: [],
+    headerExtensions: [],
+    fecMechanisms: [],
+    rtcp: []
+  };
+  var lines = SDPUtils.splitLines(mediaSection);
+  var mline = lines[0].split(' ');
+  for (var i = 3; i < mline.length; i++) { // find all codecs from mline[3..]
+    var pt = mline[i];
+    var rtpmapline = SDPUtils.matchPrefix(
+        mediaSection, 'a=rtpmap:' + pt + ' ')[0];
+    if (rtpmapline) {
+      var codec = SDPUtils.parseRtpMap(rtpmapline);
+      var fmtps = SDPUtils.matchPrefix(
+          mediaSection, 'a=fmtp:' + pt + ' ');
+      // Only the first a=fmtp:<pt> is considered.
+      codec.parameters = fmtps.length ? SDPUtils.parseFmtp(fmtps[0]) : {};
+      codec.rtcpFeedback = SDPUtils.matchPrefix(
+          mediaSection, 'a=rtcp-fb:' + pt + ' ')
+        .map(SDPUtils.parseRtcpFb);
+      description.codecs.push(codec);
+      // parse FEC mechanisms from rtpmap lines.
+      switch (codec.name.toUpperCase()) {
+        case 'RED':
+        case 'ULPFEC':
+          description.fecMechanisms.push(codec.name.toUpperCase());
+          break;
+        default: // only RED and ULPFEC are recognized as FEC mechanisms.
+          break;
+      }
+    }
+  }
+  SDPUtils.matchPrefix(mediaSection, 'a=extmap:').forEach(function(line) {
+    description.headerExtensions.push(SDPUtils.parseExtmap(line));
+  });
+  // FIXME: parse rtcp.
+  return description;
+};
+
+// Generates parts of the SDP media section describing the capabilities /
+// parameters.
+SDPUtils.writeRtpDescription = function(kind, caps) {
+  var sdp = '';
+
+  // Build the mline.
+  sdp += 'm=' + kind + ' ';
+  sdp += caps.codecs.length > 0 ? '9' : '0'; // reject if no codecs.
+  sdp += ' UDP/TLS/RTP/SAVPF ';
+  sdp += caps.codecs.map(function(codec) {
+    if (codec.preferredPayloadType !== undefined) {
+      return codec.preferredPayloadType;
+    }
+    return codec.payloadType;
+  }).join(' ') + '\r\n';
+
+  sdp += 'c=IN IP4 0.0.0.0\r\n';
+  sdp += 'a=rtcp:9 IN IP4 0.0.0.0\r\n';
+
+  // Add a=rtpmap lines for each codec. Also fmtp and rtcp-fb.
+  caps.codecs.forEach(function(codec) {
+    sdp += SDPUtils.writeRtpMap(codec);
+    sdp += SDPUtils.writeFmtp(codec);
+    sdp += SDPUtils.writeRtcpFb(codec);
+  });
+  var maxptime = 0;
+  caps.codecs.forEach(function(codec) {
+    if (codec.maxptime > maxptime) {
+      maxptime = codec.maxptime;
+    }
+  });
+  if (maxptime > 0) {
+    sdp += 'a=maxptime:' + maxptime + '\r\n';
+  }
+  sdp += 'a=rtcp-mux\r\n';
+
+  caps.headerExtensions.forEach(function(extension) {
+    sdp += SDPUtils.writeExtmap(extension);
+  });
+  // FIXME: write fecMechanisms.
+  return sdp;
+};
+
+// Parses the SDP media section and returns an array of
+// RTCRtpEncodingParameters.
+SDPUtils.parseRtpEncodingParameters = function(mediaSection) {
+  var encodingParameters = [];
+  var description = SDPUtils.parseRtpParameters(mediaSection);
+  var hasRed = description.fecMechanisms.indexOf('RED') !== -1;
+  var hasUlpfec = description.fecMechanisms.indexOf('ULPFEC') !== -1;
+
+  // filter a=ssrc:... cname:, ignore PlanB-msid
+  var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
+  .map(function(line) {
+    return SDPUtils.parseSsrcMedia(line);
+  })
+  .filter(function(parts) {
+    return parts.attribute === 'cname';
+  });
+  var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
+  var secondarySsrc;
+
+  var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
+  .map(function(line) {
+    var parts = line.split(' ');
+    parts.shift();
+    return parts.map(function(part) {
+      return parseInt(part, 10);
+    });
+  });
+  if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
+    secondarySsrc = flows[0][1];
+  }
+
+  description.codecs.forEach(function(codec) {
+    if (codec.name.toUpperCase() === 'RTX' && codec.parameters.apt) {
+      var encParam = {
+        ssrc: primarySsrc,
+        codecPayloadType: parseInt(codec.parameters.apt, 10),
+        rtx: {
+          ssrc: secondarySsrc
+        }
+      };
+      encodingParameters.push(encParam);
+      if (hasRed) {
+        encParam = JSON.parse(JSON.stringify(encParam));
+        encParam.fec = {
+          ssrc: secondarySsrc,
+          mechanism: hasUlpfec ? 'red+ulpfec' : 'red'
+        };
+        encodingParameters.push(encParam);
+      }
+    }
+  });
+  if (encodingParameters.length === 0 && primarySsrc) {
+    encodingParameters.push({
+      ssrc: primarySsrc
+    });
+  }
+
+  // we support both b=AS and b=TIAS but interpret AS as TIAS.
+  var bandwidth = SDPUtils.matchPrefix(mediaSection, 'b=');
+  if (bandwidth.length) {
+    if (bandwidth[0].indexOf('b=TIAS:') === 0) {
+      bandwidth = parseInt(bandwidth[0].substr(7), 10);
+    } else if (bandwidth[0].indexOf('b=AS:') === 0) {
+      // use formula from JSEP to convert b=AS to TIAS value.
+      bandwidth = parseInt(bandwidth[0].substr(5), 10) * 1000 * 0.95
+          - (50 * 40 * 8);
+    } else {
+      bandwidth = undefined;
+    }
+    encodingParameters.forEach(function(params) {
+      params.maxBitrate = bandwidth;
+    });
+  }
+  return encodingParameters;
+};
+
+// parses http://draft.ortc.org/#rtcrtcpparameters*
+SDPUtils.parseRtcpParameters = function(mediaSection) {
+  var rtcpParameters = {};
+
+  var cname;
+  // Gets the first SSRC. Note that with RTX there might be multiple
+  // SSRCs.
+  var remoteSsrc = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
+      .map(function(line) {
+        return SDPUtils.parseSsrcMedia(line);
+      })
+      .filter(function(obj) {
+        return obj.attribute === 'cname';
+      })[0];
+  if (remoteSsrc) {
+    rtcpParameters.cname = remoteSsrc.value;
+    rtcpParameters.ssrc = remoteSsrc.ssrc;
+  }
+
+  // Edge uses the compound attribute instead of reducedSize
+  // compound is !reducedSize
+  var rsize = SDPUtils.matchPrefix(mediaSection, 'a=rtcp-rsize');
+  rtcpParameters.reducedSize = rsize.length > 0;
+  rtcpParameters.compound = rsize.length === 0;
+
+  // parses the rtcp-mux attrіbute.
+  // Note that Edge does not support unmuxed RTCP.
+  var mux = SDPUtils.matchPrefix(mediaSection, 'a=rtcp-mux');
+  rtcpParameters.mux = mux.length > 0;
+
+  return rtcpParameters;
+};
+
+// parses either a=msid: or a=ssrc:... msid lines and returns
+// the id of the MediaStream and MediaStreamTrack.
+SDPUtils.parseMsid = function(mediaSection) {
+  var parts;
+  var spec = SDPUtils.matchPrefix(mediaSection, 'a=msid:');
+  if (spec.length === 1) {
+    parts = spec[0].substr(7).split(' ');
+    return {stream: parts[0], track: parts[1]};
+  }
+  var planB = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
+  .map(function(line) {
+    return SDPUtils.parseSsrcMedia(line);
+  })
+  .filter(function(parts) {
+    return parts.attribute === 'msid';
+  });
+  if (planB.length > 0) {
+    parts = planB[0].value.split(' ');
+    return {stream: parts[0], track: parts[1]};
+  }
+};
+
+// Generate a session ID for SDP.
+// https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-20#section-5.2.1
+// recommends using a cryptographically random +ve 64-bit value
+// but right now this should be acceptable and within the right range
+SDPUtils.generateSessionId = function() {
+  return Math.random().toString().substr(2, 21);
+};
+
+// Write boilder plate for start of SDP
+// sessId argument is optional - if not supplied it will
+// be generated randomly
+// sessVersion is optional and defaults to 2
+SDPUtils.writeSessionBoilerplate = function(sessId, sessVer) {
+  var sessionId;
+  var version = sessVer !== undefined ? sessVer : 2;
+  if (sessId) {
+    sessionId = sessId;
+  } else {
+    sessionId = SDPUtils.generateSessionId();
+  }
+  // FIXME: sess-id should be an NTP timestamp.
+  return 'v=0\r\n' +
+      'o=thisisadapterortc ' + sessionId + ' ' + version + ' IN IP4 127.0.0.1\r\n' +
+      's=-\r\n' +
+      't=0 0\r\n';
+};
+
+SDPUtils.writeMediaSection = function(transceiver, caps, type, stream) {
+  var sdp = SDPUtils.writeRtpDescription(transceiver.kind, caps);
+
+  // Map ICE parameters (ufrag, pwd) to SDP.
+  sdp += SDPUtils.writeIceParameters(
+      transceiver.iceGatherer.getLocalParameters());
+
+  // Map DTLS parameters to SDP.
+  sdp += SDPUtils.writeDtlsParameters(
+      transceiver.dtlsTransport.getLocalParameters(),
+      type === 'offer' ? 'actpass' : 'active');
+
+  sdp += 'a=mid:' + transceiver.mid + '\r\n';
+
+  if (transceiver.direction) {
+    sdp += 'a=' + transceiver.direction + '\r\n';
+  } else if (transceiver.rtpSender && transceiver.rtpReceiver) {
+    sdp += 'a=sendrecv\r\n';
+  } else if (transceiver.rtpSender) {
+    sdp += 'a=sendonly\r\n';
+  } else if (transceiver.rtpReceiver) {
+    sdp += 'a=recvonly\r\n';
+  } else {
+    sdp += 'a=inactive\r\n';
+  }
+
+  if (transceiver.rtpSender) {
+    // spec.
+    var msid = 'msid:' + stream.id + ' ' +
+        transceiver.rtpSender.track.id + '\r\n';
+    sdp += 'a=' + msid;
+
+    // for Chrome.
+    sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
+        ' ' + msid;
+    if (transceiver.sendEncodingParameters[0].rtx) {
+      sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].rtx.ssrc +
+          ' ' + msid;
+      sdp += 'a=ssrc-group:FID ' +
+          transceiver.sendEncodingParameters[0].ssrc + ' ' +
+          transceiver.sendEncodingParameters[0].rtx.ssrc +
+          '\r\n';
+    }
+  }
+  // FIXME: this should be written by writeRtpDescription.
+  sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
+      ' cname:' + SDPUtils.localCName + '\r\n';
+  if (transceiver.rtpSender && transceiver.sendEncodingParameters[0].rtx) {
+    sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].rtx.ssrc +
+        ' cname:' + SDPUtils.localCName + '\r\n';
+  }
+  return sdp;
+};
+
+// Gets the direction from the mediaSection or the sessionpart.
+SDPUtils.getDirection = function(mediaSection, sessionpart) {
+  // Look for sendrecv, sendonly, recvonly, inactive, default to sendrecv.
+  var lines = SDPUtils.splitLines(mediaSection);
+  for (var i = 0; i < lines.length; i++) {
+    switch (lines[i]) {
+      case 'a=sendrecv':
+      case 'a=sendonly':
+      case 'a=recvonly':
+      case 'a=inactive':
+        return lines[i].substr(2);
+      default:
+        // FIXME: What should happen here?
+    }
+  }
+  if (sessionpart) {
+    return SDPUtils.getDirection(sessionpart);
+  }
+  return 'sendrecv';
+};
+
+SDPUtils.getKind = function(mediaSection) {
+  var lines = SDPUtils.splitLines(mediaSection);
+  var mline = lines[0].split(' ');
+  return mline[0].substr(2);
+};
+
+SDPUtils.isRejected = function(mediaSection) {
+  return mediaSection.split(' ', 2)[1] === '0';
+};
+
+SDPUtils.parseMLine = function(mediaSection) {
+  var lines = SDPUtils.splitLines(mediaSection);
+  var mline = lines[0].split(' ');
+  return {
+    kind: mline[0].substr(2),
+    port: parseInt(mline[1], 10),
+    protocol: mline[2],
+    fmt: mline.slice(3).join(' ')
+  };
+};
+
+// Expose public methods.
+if (true) {
+  module.exports = SDPUtils;
+}
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__index_js__ = __webpack_require__(8);
+AFRAME.registerSystem('wevr-auto-start', {
+  init() {
+    var wevr = this.el.systems.wevr;
+    wevr.data.startOnLoad = true;
+    wevr.start();
+  }
+});
+
+
+
+/***/ }),
+/* 8 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Components_js__ = __webpack_require__(9);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__WevrSystem_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_aframe_joysticks_movement_component__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_webrtc_adapter__ = __webpack_require__(22);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_webrtc_adapter___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_webrtc_adapter__);
+
+
+
+
+
+
+
+/***/ }),
+/* 9 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_lodash__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_three__ = __webpack_require__(4);
+
+
+
+
+
+AFRAME.registerComponent('wevr-avatar', {
+  schema: {type: "string"},
+  init() {
+    this.el.innerHTML = `<a-sphere class="head"
+                          color="#5985ff"
+                          position="0 -0.05 0"
+                          scale="0.25 0.3 0.2">
+
+<a-entity class="face"
+                          position="0 0 -0.6">
+                        <a-sphere position="0 0.05 -0.4"
+                          color="#5985ff"
+                          scale="0.18 0.18 0.18">
+                </a-sphere>
+                    <a-sphere class="eye"
+                              color="#efefef"
+                              position="0.3 0.35 -0.3"
+                              scale="0.15 0.15 0.15"
+                            >
+                        <a-sphere class="pupil"
+                                  color="#000"
+                                  position="0 0 -1"
+                                  scale="0.45 0.45 0.45"
+                                ></a-sphere>
+                    </a-sphere>
+                    <a-sphere class="eye"
+                              color="#efefef"
+                              position="-0.3 0.35 -0.3"
+                              scale="0.15 0.15 0.15"
+                            >
+                        <a-sphere class="pupil"
+                                  color="#000"
+                                  position="0 0 -1"
+                                  scale="0.45 0.45 0.45"
+                                ></a-sphere>
+                    </a-sphere>
+                </a-entity>
+
+                </a-sphere>
+                `;
+    this.system = this.el.sceneEl.systems.wevr;
+
+    var channels = this.system.channels;
+    this.targetPosition = new __WEBPACK_IMPORTED_MODULE_2_three__["b" /* Vector3 */]();
+    this.startPosition = new __WEBPACK_IMPORTED_MODULE_2_three__["b" /* Vector3 */]();
+    this.targetRotation = new __WEBPACK_IMPORTED_MODULE_2_three__["a" /* Quaternion */]();
+
+    channels.addEventListenerForPeer(this.data, "wevr.movement", (event) => {
+      this.system.updateMovement(this.el, event, this);
+    })
+  },
+
+  tick(time, timeDelta) {
+    this.system.makeMovementChanges(this);
+    this.system.positionalAudio.makeAudioPositionChanges(this.data, this.targetPosition);
+  }
+});
+
+AFRAME.registerComponent('wevr-avatar-hand', {
+  schema: {
+    peer: {type: "string"},
+    hand: {type: "string"}
+  },
+  init() {
+    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
+
+    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
+    <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#5985ff" radius="0.1"></a-sphere>
+    </a-sphere>`;
+
+    this.system = this.el.sceneEl.systems.wevr;
+    var channels = this.system.channels;
+
+    this.targetPosition = new __WEBPACK_IMPORTED_MODULE_2_three__["b" /* Vector3 */]();
+    this.startPosition = new __WEBPACK_IMPORTED_MODULE_2_three__["b" /* Vector3 */]();
+    this.targetRotation = new __WEBPACK_IMPORTED_MODULE_2_three__["a" /* Quaternion */]();
+    channels.addEventListenerForPeer(this.data.peer, `wevr.movement.hands.${this.data.hand}`, (event) => {
+      this.system.updateMovement(this.el, event, this);
+    });
+  },
+
+  tick(time, timeDelta) {
+    this.system.makeMovementChanges(this);
+  }
+});
+
+AFRAME.registerComponent('wevr-player', {
+  init() {
+    this.system = this.el.sceneEl.systems.wevr;
+
+    this.setInitialPosition(this.el.parentNode);
+    this.el.object3D.updateMatrixWorld();
+    this.position = this.el.object3D.getWorldPosition();
+    this.quaternion = this.el.object3D.getWorldQuaternion();
+    this.period = this.system.data.period;
+
+    this.system.channels.addEventListener("ready", (data, peer) => {
+      this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init movement: " + peer, false);
+    });
+  },
+
+  setInitialPosition(el) {
+    var center = {x: 0, y: 0, z: 0};
+    let radius = 3;
+
+    var angleRad = this.getRandomAngleInRadians();
+    var circlePoint = this.randomPointOnCircle(radius, angleRad);
+    var worldPoint = {x: circlePoint.x + center.x, y: center.y, z: circlePoint.y + center.z};
+    el.setAttribute('position', worldPoint);
+
+    var angleDeg = angleRad * 180 / Math.PI;
+    var angleToCenter = -1 * angleDeg + 90;
+    var rotationStr = '0 ' + angleToCenter + ' 0';
+    el.setAttribute('rotation', rotationStr);
+  },
+
+  tick(time, delta) {
+    if (!this.lastSent || time - this.lastSent > this.period) {
+      this.el.object3D.updateMatrixWorld(true);
+      var position = this.el.object3D.getWorldPosition();
+      var quaternion = this.el.object3D.getWorldQuaternion();
+
+      if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+        this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
+        this.position = position;
+        this.quaternion = quaternion;
+        this.system.positionalAudio.updateListener(this.el.object3D.matrixWorld);
+      }
+      this.lastSent = time;
+    }
+  },
+
+  getRandomAngleInRadians: function () {
+    return Math.random() * Math.PI * 2;
+  },
+
+  randomPointOnCircle: function (radius, angleRad) {
+    let x = Math.cos(angleRad) * radius;
+    let y = Math.sin(angleRad) * radius;
+    return {x: x, y: y};
+  }
+});
+
+
+AFRAME.registerComponent('wevr-player-hand', {
+  schema: {type: "string"},
+  init() {
+    this.system = this.el.sceneEl.systems.wevr;
+
+    this.initializeHands();
+    window.addEventListener("gamepadconnected", () => {
+      this.initializeHands()
+    });
+  },
+
+  initializeHands() {
+    this.hasHand = this.checkHand(this.data);
+    if (this.hasHand) {
+      this.el.setAttribute("visible", "true");
+      this.el.object3D.updateMatrixWorld();
+      this.position = this.el.object3D.getWorldPosition();
+      this.quaternion = this.el.object3D.getWorldQuaternion();
+      this.period = this.system.data.period;
+
+      this.system.channels.addEventListener("ready", (data, peer) => {
+        this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
+          hand: this.data,
+          position: this.position,
+          quaternion: this.quaternion
+        });
+        __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init hand movement: " + this.data + peer, false);
+      });
+
+    } else {
+      this.el.setAttribute("visible", "false");
+    }
+  },
+
+  checkHand(hand) {
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.toLowerCase().indexOf(hand) != -1) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  },
+
+  tick(time, delta) {
+    if (this.hasHand) {
+      if (!this.lastSent || time - this.lastSent > this.period) {
+        this.el.object3D.updateMatrixWorld(true);
+        var position = this.el.object3D.getWorldPosition();
+        var quaternion = this.el.object3D.getWorldQuaternion();
+
+        if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+          this.system.channels.broadcast("wevr.movement.hands." + this.data, {
+            position: position,
+            quaternion: quaternion
+          });
+          this.position = position;
+          this.quaternion = quaternion;
+        }
+        this.lastSent = time;
+      }
+    }
+  }
+});
+
+
+AFRAME.registerComponent('maybe-cursor', {
+  init() {
+    if (!this.el.sceneEl.is('vr-mode')) {
+      this.addCursor();
+    } else {
+      this.removeCursor();
+    }
+    this.el.sceneEl.addEventListener('enter-vr', () => this.removeCursor());
+    this.el.sceneEl.addEventListener('exit-vr', () => this.addCursor());
+  },
+
+  removeCursor() {
+    this.el.removeAttribute("cursor");
+    this.el.setAttribute("visible", "false");
+  },
+
+  addCursor() {
+    this.el.setAttribute("cursor", "");
+    this.el.setAttribute("visible", "true");
+  }
+});
+
+
+AFRAME.registerComponent('refresh-button', {
+
+  types: {GAMEPAD: 'gamepad', OCULUS: 'oculus-touch', VIVE: 'vive'},
+
+  tick: function () {
+    if (!this.button) {
+      var gamepad = this.getGamepad();
+      if (gamepad) {
+        this.button = gamepad.buttons[0].pressed;
+        if (this.button) {
+          setTimeout(() => {
+            if (this.getGamepad().buttons[0].pressed) {
+              location.reload();
+            }
+            this.button = undefined;
+          }, 1000);
+        }
+      }
+    }
+  },
+
+  checkControllerType: function () {
+    var typeFound = this.types.GAMEPAD;
+    var indexFound = 0;
+    var gamepads = navigator.getGamepads && navigator.getGamepads();
+    var i = 0;
+    if (gamepads) {
+      for (; i < gamepads.length; i++) {
+        var gamepad = gamepads[i];
+        if (gamepad) {
+          if (gamepad.id.indexOf('Oculus Touch') === 0) {
+            typeFound = this.types.OCULUS;
+            indexFound = i;
+            break;
+          }
+          if (gamepad.id.indexOf('OpenVR Gamepad') === 0) {
+            typeFound = this.types.VIVE;
+            indexFound = i;
+            break;
+          }
+          indexFound = i;
+        }
+      }
+      return {index: indexFound, type: typeFound};
+    }
+    return false;
+  },
+
+  getGamepad: function () {
+    var type = this.checkControllerType();
+    return type
+      && navigator.getGamepads()[type.index];
+  }
+});
+
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports) {
+
+module.exports = function(module) {
+	if(!module.webpackPolyfill) {
+		module.deprecate = function() {};
+		module.paths = [];
+		// module.parent = undefined by default
+		if(!module.children) module.children = [];
+		Object.defineProperty(module, "loaded", {
+			enumerable: true,
+			get: function() {
+				return module.l;
+			}
+		});
+		Object.defineProperty(module, "id", {
+			enumerable: true,
+			get: function() {
+				return module.i;
+			}
+		});
+		module.webpackPolyfill = 1;
+	}
+	return module;
+};
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_detect_browser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_detect_browser__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Utils__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_three__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_lodash___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_8_lodash__);
+
+
+
+
+
+
+
+
+
+
+
+AFRAME.registerSystem('wevr', {
+  schema: {
+    period: {default: 100},
+    signalUrl: {default: 'wss://wevr.vrlobby.co/wevr'},
+    startOnLoad: {default: false}
+  },
+
+  init() {
+    if (this.data.startOnLoad) this.start();
+  },
+
+  start() {
+    this.signaller = new __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__["a" /* default */](this.data.signalUrl);
+    let broker = new __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__["a" /* default */](this.signaller);
+    this.channels = new __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__["a" /* default */](broker);
+    this.stateHandler = new __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__["a" /* default */](this.signaller, this.channels);
+    this.positionalAudio = new __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__["a" /* default */]();
+
+    this.setUpPlayer(this.el.sceneEl);
+
+    this.setUpAudio(broker, this.el);
+
+    this.setUpAvatars(this.channels, this.el.sceneEl);
+
+    this.setUpPeerConnectionChecks(broker, this.channels);
+
+    if (this.el.hasLoaded) {
+      this.signaller.start();
+    } else {
+      this.el.addEventListener("loaded", () => {
+        this.signaller.start();
+      });
+    }
+  },
+
+  setUpPeerConnectionChecks(broker, channels) {
+    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
+    channels.addEventListener("wevr.peer-ping", (param, peer) => {
+      this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
+    });
+    broker.onreconnect = () => {
+      __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("received reconnect. reloading: " + window.wevr.id);
+      location.reload();
+    }
+  },
+
+  checkConnections(peers, broker) {
+    this.pingReplies = [];
+    this.pingRecpients = peers;
+    var self = this;
+    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
+    peers.forEach((peer) => {
+      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
+        self.pingReplies.push(peer);
+      })
+    });
+    this.channels.broadcast("wevr.peer-ping",{});
+    setTimeout(()=> {
+        if (self.pingRecpients.length != self.pingReplies.length) {
+          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
+            __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("no answers, i might be the problem");
+            broker.onreconnect();
+          } else {
+            this.signaller.signal({
+              event: "wevr.peer-ping-failure",
+              data: __WEBPACK_IMPORTED_MODULE_8_lodash__["difference"](self.pingRecpients, self.pingReplies)
+            })
+          }
+        }
+      }
+      , 30000);
+
+  },
+
+  setUpPlayer(sceneEl) {
+    let element = document.createElement("a-entity");
+    element.setAttribute("id", "player");
+    element.setAttribute("joysticks-movement", "");
+    element.innerHTML =
+      `<a-entity wevr-player refresh-button wasd-controls look-controls camera="userHeight:1.6">
+    <a-entity maybe-cursor
+            visible="false"
+            position="0 0 -1"
+            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
+            material="color: darkgrey; shader: flat"></a-entity>
+    <a-entity id="audioinfo" text="value:requesting microphone;color:#ccc;anchor:center;baseline:center;width:2;align:center;transparent:true" position="0 -0.75 -2"></a-entity>
+    </a-entity>
+    <a-entity wevr-player-hand="right" hand-controls="right" cursor="downEvents:triggerdown;upEvents:triggerup" raycaster="showLine:true"></a-entity>
+    <a-entity wevr-player-hand="left" hand-controls="left"></a-entity>`;
+    sceneEl.appendChild(element);
+  },
+
+  setUpAudio(broker, sceneEl) {
+    broker.onaudio = () => {
+      var el = document.getElementById("audioinfo");
+      if (el) {
+        if (broker.audioState == "success") {
+          el.setAttribute("visible", "false");
+        } else {
+          el.setAttribute("text","value",broker.audioState)
+        }
+      }
+    };
+    broker.onpeeraudio = (stream, peer) => {
+      const browser = Object(__WEBPACK_IMPORTED_MODULE_5_detect_browser__["detect"])();
+      switch (browser && browser.name) {
+        case 'chrome':
+          this.useAudioElement(stream, peer, sceneEl);
+          break;
+        default:
+          this.positionalAudio.usePositionalAudio(stream, peer);
+      }
+    };
+  },
+
+  useAudioElement(stream, peer, el) {
+    let element = document.createElement("audio");
+    this.findPeerElement(peer, el).appendChild(element);
+    element.autoplay = true;
+    element.srcObject = stream;
+    element.play();
+  },
+
+  setUpAvatars(channels, sceneEl) {
+    channels.addEventListener("open", (data, peer) => {
+      let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
+
+      channels.addEventListenerForPeer(peer, "wevr.movement-init", (event) => {
+        element.object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
+        element.object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
+        element.setAttribute("visible", "true");
+      });
+
+      channels.addEventListenerForPeer(peer, `wevr.movement-init.hand`, (event) => {
+        let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar-hand", `peer:${peer};hand:${event.hand}`);
+        var object3D = element.object3D;
+        object3D.position.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["b" /* Vector3 */](event.position.x, event.position.y, event.position.z));
+        object3D.quaternion.copy(new __WEBPACK_IMPORTED_MODULE_7_three__["a" /* Quaternion */](event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));
+        element.setAttribute("visible", "true");
+      });
+    });
+  },
+
+  createAvatarElement(peer, sceneEl, componentName, value) {
+    let element = document.createElement("a-entity");
+    element.setAttribute(componentName, value);
+    element.setAttribute("visible", "false");
+    this.findPeerElement(peer, sceneEl).appendChild(element);
+    return element;
+  },
+
+  findPeerElement(peer, sceneEl) {
+    let element = document.getElementById(peer);
+    if (!element) {
+      element = document.createElement("a-entity");
+      element.setAttribute("id", peer);
+      sceneEl.appendChild(element);
+    }
+    return element;
+  },
+
+  updateMovement(element, event, component) {
+    component.targetPosition.x = event.position.x;
+    component.targetPosition.y = event.position.y;
+    component.targetPosition.z = event.position.z;
+    component.startPosition.x = element.object3D.position.x;
+    component.startPosition.y = element.object3D.position.y;
+    component.startPosition.z = element.object3D.position.z;
+    component.targetRotation.x = event.quaternion._x;
+    component.targetRotation.y = event.quaternion._y;
+    component.targetRotation.z = event.quaternion._z;
+    component.targetRotation.w = event.quaternion._w;
+    component.timeUpdated = Date.now();
+  },
+
+  makeMovementChanges(source) {
+    if (source.timeUpdated) {
+      let progress = (Date.now() - source.timeUpdated) / this.period;
+      if (progress < 1) {
+        if (source.targetPosition) {
+          source.el.object3D.position.lerpVectors(source.startPosition, source.targetPosition, progress);
+
+        }
+        if (source.targetRotation) {
+          source.el.object3D.quaternion.slerp(source.targetRotation, progress);
+        }
+      } else {
+        if (source.targetPosition) {
+          source.el.object3D.position.copy(source.targetPosition);
+        }
+        if (source.targetRotation) {
+          source.el.object3D.quaternion.copy(source.targetRotation);
+        }
+        source.timeUpdated = undefined;
+      }
+    }
+  }
+});
+
+/***/ }),
+/* 12 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Utils__ = __webpack_require__(1);
+
+
+class SignallingClient {
+
+  constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
+    this.host = host;
+    this.roomId = roomId;
+    this.secondsTilRetry = 2;
+    this.listeners = {};
+  }
+
+  start() {
+    if (this.ws) {
+      this.close();
+    }
+    this.ws = this.connect(this.host, this.roomId);
+  }
+
+  close() {
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+
+  connect(host, roomId) {
+    let ws = new WebSocket(`${host}/${roomId}`);
+    ws.onclose = () => {
+      if (this.secondsTilRetry < 33) {
+        this.secondsTilRetry = this.secondsTilRetry * 2;
+        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws closed! - trying to reopen in " + this.secondsTilRetry + " seconds");
+        setTimeout(() => {
+          try {
+            this.start();
+          } catch (e) {
+            __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(e);
+          }
+        }, 1000 * this.secondsTilRetry);
+      } else {
+        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws closed! - giving up");
+      }
+    };
+
+    ws.onopen = () => {
+      this.secondsTilRetry = 2;
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].info("ws opened");
+    };
+
+    ws.onerror = (error) => {
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(error);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        var msg = JSON.parse(event.data);
+        if (msg.event != "wevr.ping") {
+          __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("ws received: " + event.data);
+        }
+        this.dispatch(msg);
+      } catch (e) {
+        __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].error(e);
+      }
+    };
+    return ws;
+  }
+
+  addEventListener(type, listener) {
+    if (!(type in this.listeners)) {
+      this.listeners[type] = [];
+    }
+    this.listeners[type].push(listener);
+  }
+
+  dispatch(msg) {
+    var type = msg.event;
+    var param = msg.data;
+    if (!(type in this.listeners)) {
+      return true;
+    }
+    var stack = this.listeners[type];
+    stack.forEach( (element) => {
+      element.call(this, param);
+      });
+  }
+
+  signal(msg) {
+    let msgString = JSON.stringify(msg);
+    __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("signaling: " + msgString);
+    this.ws.send(msgString);
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = SignallingClient;
+
+
+/***/ }),
+/* 13 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__DataChannels_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Utils__ = __webpack_require__(1);
+
+
+
+class RTCConnectionBroker {
+
+  constructor(signallingClient) {
+
+    this.iceConfiguration = {
+      iceServers: [{
+        urls: [
+          "stun:stun.l.google.com:19302"
+        ]
+      }, {
+        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
+        credential: "noone",
+        username: "none"
+      }]
+    };
+
+    let constraints = {audio: true, video: false};
+    var self = this;
+    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
+      self.audioState = 'success';
+      self.onaudio();
+      return audio;
+    }).catch((e) => {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(e);
+      self.audioState = 'mute';
+      self.onaudio();
+    });
+    this.audioState = 'requesting';
+    this.signallingClient = signallingClient;
+    this.connections = {};
+    this.candidates = {}
+    this.listen("wevr.connect", (data) => {
+      this.connectTo(data);
+    });
+    this.listen("wevr.offer", (data) => {
+      this.acceptOffer(data);
+    });
+    this.listen("wevr.answer", (data) => {
+      this.acceptAnswer(data);
+    });
+    this.listen("wevr.ice-candidate", (data) => {
+      this.acceptIceCandidate(data);
+    });
+    this.listen("wevr.leftgame", (data) => {
+      this.leftgame(data);
+    });
+    this.listen("wevr.check-connections", (data) => {
+      this.checkConnections(data);
+    });
+    this.listen("wevr.reconnect", () => {
+      this.reconnect();
+    });
+    this.listen("wevr.id", (data) => {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].info(`I am ${data}`);
+      window.wevr.id = data;
+    });
+  }
+
+  listen(event, listener) {
+    this.signallingClient.addEventListener(event, listener);
+  }
+
+  connectTo(recipient) {
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].info(`gonna connect to ${recipient}`);
+    let connection = new RTCPeerConnection(this.iceConfiguration);
+    this.connections[recipient] = connection;
+
+    this.setUpConnection(connection, recipient).then(() => {
+      this.createOfferAndSignal(connection, recipient);
+    });
+  }
+
+  setUpConnection(connection, peer) {
+    var self = this;
+    connection.oniceconnectionstatechange = (e) => {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} state changed to ${connection.iceConnectionState}`, true);
+      if (connection.iceConnectionState == 'failed') {
+        self.signaller.signal({
+          event: "wevr.peer-ping-failure",
+          data: [peer]
+        })
+      }
+    };
+    connection.onnegotiationneeded = (e) => {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`${peer} negotiation needed`, true);
+    };
+    this.handleIceCandidates(connection, peer);
+    return this.addAudio(connection, peer);
+  }
+
+  createOfferAndSignal(connection, recipient) {
+    var channel = connection.createDataChannel("data");
+    channel.onopen = (event) => {
+      this.onchannel(recipient, channel);
+    };
+
+    connection.createOffer().then((offer) => {
+      connection.setLocalDescription(offer);
+      this.signallingClient.signal({
+        event: "wevr.offer",
+        data: {to: recipient, payload: offer}
+      });
+    });
+  }
+
+  handleIceCandidates(connection, peer) {
+    this.candidates[peer] = [];
+    connection.onicecandidate = (event) => {
+      if (event.candidate) {
+        if (this.sending) {
+          this.signalCandidate(peer, event.candidate);
+        } else {
+          this.candidates[peer].push(event.candidate);
+        }
+      }
+    };
+  }
+
+  signalCandidate(peer, candidate) {
+    this.signallingClient.signal({
+      event: "wevr.ice-candidate",
+      data: {to: peer, payload: candidate}
+    });
+  }
+
+  addAudio(connection, peer) {
+    connection.ontrack = (e) => {
+      this.onpeeraudio(e.streams[0], peer);
+    };
+    return this.audio.then((stream) => {
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          connection.addTrack(track, stream);
+        });
+      }
+    }).catch(function (err) {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(err);
+    });
+
+  }
+
+  acceptOffer(data) {
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting offer from ${data.from}`);
+    let connection = new RTCPeerConnection(this.iceConfiguration);
+    connection.ondatachannel = (event) => {
+      event.channel.onopen = () => {
+        this.onchannel(data.from, event.channel);
+      };
+    };
+    this.connections[data.from] = connection;
+    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
+
+    this.setUpConnection(connection, data.from).then(() => {
+      this.createAnswerAndSignal(connection, data.from);
+    });
+  }
+
+  acceptAnswer(data) {
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting answer from ${data.from}`);
+    let connection = this.connections[data.from];
+    connection.setRemoteDescription(new RTCSessionDescription(data.payload));
+    this.sendCachedCandidates(data.from);
+  }
+
+  sendCachedCandidates(peer) {
+    this.candidates[peer].forEach((candidate) => {
+      this.signalCandidate(peer, candidate);
+    });
+    this.sending = true;
+  }
+
+  createAnswerAndSignal(connection, sender) {
+    connection.createAnswer().then((answer) => {
+      connection.setLocalDescription(answer);
+      this.signallingClient.signal({
+        event: "wevr.answer",
+        data: {to: sender, payload: answer}
+      });
+    });
+  }
+
+  acceptIceCandidate(data) {
+    __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`accepting ice-candidate from ${data.from}`);
+    let connection = this.connections[data.from];
+    connection.addIceCandidate(new RTCIceCandidate(data.payload));
+    if (!this.sending) {
+      this.sendCachedCandidates(data.from);
+    }
+  }
+
+  leftgame(peer) {
+    if (this.connections[peer]) {
+      this.connections[peer].close();
+      delete this.connections[peer];
+    }
+    var element = document.getElementById(peer);
+    if (element) {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug(`removing ${peer}`, true);
+      element.parentNode.removeChild(element);
+    }
+  }
+
+  checkConnections(peers) {
+    this.oncheckconnections(peers);
+  }
+
+  reconnect() {
+    this.onreconnect();
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = RTCConnectionBroker;
+
+
+/***/ }),
+/* 14 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+class StateHandler {
+  constructor(signaller, dataChannels) {
+    this.signaller = signaller;
+    this.dataChannels = dataChannels;
+    this.listeners = {};
+    this.signaller.addEventListener("wevr.state", (data) => {
+      this.dispatch(data);
+    });
+    this.dataChannels.addEventListener("wevr.state", (data) => {
+      this.dispatch(data);
+    });
+  }
+
+  updateState(key, data) {
+    this.signaller.signal({event: "wevr.state", data: {key, data}});
+    this.dataChannels.broadcast("wevr.state", {key, data});
+  }
+
+  addStateListener(type, listener) {
+    if (!(type in this.listeners)) {
+      this.listeners[type] = [];
+    }
+    this.listeners[type].push(listener);
+  }
+
+  dispatch(msg) {
+    var type = msg.key;
+    var param = msg.data;
+    if (!(type in this.listeners)) {
+      return true;
+    }
+    var stack = this.listeners[type];
+    stack.forEach( (element) => {
+      element.call(this, param);
+    });
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = StateHandler;
+
+
+/***/ }),
+/* 15 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+class PositionalAudio {
+
+  constructor() {
+    this.panners = {};
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  updateListener(matrix) {
+    var p = new THREE.Vector3();
+    var vec = new THREE.Vector3(0, 0, 1);
+    var up = new THREE.Vector3(0, -1, 0);
+
+    this.updateListener = function (matrix) {
+      vec.x = 0;
+      vec.y = 0;
+      vec.z = 1;
+      up.x = 0;
+      up.y = -1;
+      up.z = 0;
+      p.x = 0;
+      p.y = 0;
+      p.z = 0;
+      p.setFromMatrixPosition(matrix);
+
+      this.audioCtx.listener.setPosition(p.x, p.y, p.z);
+
+      var mx = matrix.elements[12], my = matrix.elements[13], mz = matrix.elements[14];
+      matrix.elements[12] = matrix.elements[13] = matrix.elements[14] = 0;
+
+// Multiply the orientation vector by the world matrix of the camera.
+      vec.applyMatrix4(matrix);
+      vec.normalize();
+
+// Multiply the up vector by the world matrix.
+      up.applyMatrix4(matrix);
+      up.normalize();
+
+// Set the orientation and the up-vector for the listener.
+      this.audioCtx.listener.setOrientation(vec.x, vec.y, vec.z, up.x, up.y, up.z);
+
+      matrix.elements[12] = mx;
+      matrix.elements[13] = my;
+      matrix.elements[14] = mz;
+    };
+    this.updateListener(matrix);
+  }
+
+  usePositionalAudio(track, peer) {
+    let source = this.audioCtx.createMediaStreamSource(track);
+    let panner = this.audioCtx.createPanner();
+    source.connect(panner);
+    panner.connect(this.audioCtx.destination);
+    this.panners[peer] = panner;
+  }
+
+  makeAudioPositionChanges(peer, position) {
+    let positionalAudio = this.panners[peer];
+    if (positionalAudio && position) {
+      this.setPannerPosition(positionalAudio, position);
+    }
+  }
+
+  setPannerPosition(panner, position) {
+    if (panner.positionX) {
+      panner.positionX.value = position.x;
+      panner.positionY.value = position.y;
+      panner.positionZ.value = position.z;
+    } else {
+      panner.setPosition(position.x, position.y, position.z);
+    }
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = PositionalAudio;
+
+
+/***/ }),
+/* 16 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(process) {/**
+  # detect-browser
+
+  This is a package that attempts to detect a browser vendor and version (in
+  a semver compatible format) using a navigator useragent in a browser or
+  `process.version` in node.
+
+  ## NOTE: Version 2.x release
+
+  Release 2.0 introduces a breaking API change (hence the major release)
+  which requires invocation of a `detect` function rather than just inclusion of
+  the module.  PR [#46](https://github.com/DamonOehlman/detect-browser/pull/46)
+  provides more context as to why this change has been made.
+
+  ## Example Usage
+
+  <<< examples/simple.js
+
+  Or you can use a switch statement:
+
+  <<< examples/switch.js
+
+  ## Adding additional browser support
+
+  The current list of browsers that can be detected by `detect-browser` is
+  not exhaustive. If you have a browser that you would like to add support for
+  then please submit a pull request with the implementation.
+
+  Creating an acceptable implementation requires two things:
+
+  1. A test demonstrating that the regular expression you have defined identifies
+     your new browser correctly.  Examples of this can be found in the 
+     `test/logic.js` file.
+
+  2. Write the actual regex to the `lib/detectBrowser.js` file. In most cases adding
+     the regex to the list of existing regexes will be suitable (if usage of `detect-brower`
+     returns `undefined` for instance), but in some cases you might have to add it before
+     an existing regex.  This would be true for a case where you have a browser that
+     is a specialised variant of an existing browser but is identified as the
+     non-specialised case.
+
+  When writing the regular expression remember that you would write it containing a
+  single [capturing group](https://regexone.com/lesson/capturing_groups) which
+  captures the version number of the browser.
+
+**/
+
+function detect() {
+  var nodeVersion = getNodeVersion();
+  if (nodeVersion) {
+    return nodeVersion;
+  } else if (typeof navigator !== 'undefined') {
+    return parseUserAgent(navigator.userAgent);
+  }
+
+  return null;
+}
+
+function detectOS(userAgentString) {
+  var rules = getOperatingSystemRules();
+  var detected = rules.filter(function (os) {
+    return os.rule && os.rule.test(userAgentString);
+  })[0];
+
+  return detected ? detected.name : null;
+}
+
+function getNodeVersion() {
+  var isNode = typeof navigator === 'undefined' && typeof process !== 'undefined';
+  return isNode ? {
+    name: 'node',
+    version: process.version.slice(1),
+    os: __webpack_require__(18).type().toLowerCase()
+  } : null;
+}
+
+function parseUserAgent(userAgentString) {
+  var browsers = getBrowserRules();
+  if (!userAgentString) {
+    return null;
+  }
+
+  var detected = browsers.map(function(browser) {
+    var match = browser.rule.exec(userAgentString);
+    var version = match && match[1].split(/[._]/).slice(0,3);
+
+    if (version && version.length < 3) {
+      version = version.concat(version.length == 1 ? [0, 0] : [0]);
+    }
+
+    return match && {
+      name: browser.name,
+      version: version.join('.')
+    };
+  }).filter(Boolean)[0] || null;
+
+  if (detected) {
+    detected.os = detectOS(userAgentString);
+  }
+
+  return detected;
+}
+
+function getBrowserRules() {
+  return buildRules([
+    [ 'edge', /Edge\/([0-9\._]+)/ ],
+    [ 'yandexbrowser', /YaBrowser\/([0-9\._]+)/ ],
+    [ 'vivaldi', /Vivaldi\/([0-9\.]+)/ ],
+    [ 'kakaotalk', /KAKAOTALK\s([0-9\.]+)/ ],
+    [ 'chrome', /(?!Chrom.*OPR)Chrom(?:e|ium)\/([0-9\.]+)(:?\s|$)/ ],
+    [ 'phantomjs', /PhantomJS\/([0-9\.]+)(:?\s|$)/ ],
+    [ 'crios', /CriOS\/([0-9\.]+)(:?\s|$)/ ],
+    [ 'firefox', /Firefox\/([0-9\.]+)(?:\s|$)/ ],
+    [ 'fxios', /FxiOS\/([0-9\.]+)/ ],
+    [ 'opera', /Opera\/([0-9\.]+)(?:\s|$)/ ],
+    [ 'opera', /OPR\/([0-9\.]+)(:?\s|$)$/ ],
+    [ 'ie', /Trident\/7\.0.*rv\:([0-9\.]+).*\).*Gecko$/ ],
+    [ 'ie', /MSIE\s([0-9\.]+);.*Trident\/[4-7].0/ ],
+    [ 'ie', /MSIE\s(7\.0)/ ],
+    [ 'bb10', /BB10;\sTouch.*Version\/([0-9\.]+)/ ],
+    [ 'android', /Android\s([0-9\.]+)/ ],
+    [ 'ios', /Version\/([0-9\._]+).*Mobile.*Safari.*/ ],
+    [ 'safari', /Version\/([0-9\._]+).*Safari/ ]
+  ]);
+}
+
+function getOperatingSystemRules() {
+  return buildRules([
+    [ 'iOS', /iP(hone|od|ad)/ ],
+    [ 'Android OS', /Android/ ],
+    [ 'BlackBerry OS', /BlackBerry|BB10/ ],
+    [ 'Windows Mobile', /IEMobile/ ],
+    [ 'Amazon OS', /Kindle/ ],
+    [ 'Windows 3.11', /Win16/ ],
+    [ 'Windows 95', /(Windows 95)|(Win95)|(Windows_95)/ ],
+    [ 'Windows 98', /(Windows 98)|(Win98)/ ],
+    [ 'Windows 2000', /(Windows NT 5.0)|(Windows 2000)/ ],
+    [ 'Windows XP', /(Windows NT 5.1)|(Windows XP)/ ],
+    [ 'Windows Server 2003', /(Windows NT 5.2)/ ],
+    [ 'Windows Vista', /(Windows NT 6.0)/ ],
+    [ 'Windows 7', /(Windows NT 6.1)/ ],
+    [ 'Windows 8', /(Windows NT 6.2)/ ],
+    [ 'Windows 8.1', /(Windows NT 6.3)/ ],
+    [ 'Windows 10', /(Windows NT 10.0)/ ],
+    [ 'Windows ME', /Windows ME/ ],
+    [ 'Open BSD', /OpenBSD/ ],
+    [ 'Sun OS', /SunOS/ ],
+    [ 'Linux', /(Linux)|(X11)/ ],
+    [ 'Mac OS', /(Mac_PowerPC)|(Macintosh)/ ],
+    [ 'QNX', /QNX/ ],
+    [ 'BeOS', /BeOS/ ],
+    [ 'OS/2', /OS\/2/ ],
+    [ 'Search Bot', /(nuhk)|(Googlebot)|(Yammybot)|(Openbot)|(Slurp)|(MSNBot)|(Ask Jeeves\/Teoma)|(ia_archiver)/ ]
+  ]);
+}
+
+function buildRules(ruleTuples) {
+  return ruleTuples.map(function(tuple) {
+    return {
+      name: tuple[0],
+      rule: tuple[1]
+    };
+  });
+}
+
+module.exports = {
+  detect: detect,
+  detectOS: detectOS,
+  getNodeVersion: getNodeVersion,
+  parseUserAgent: parseUserAgent
+};
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)))
+
+/***/ }),
+/* 17 */
+/***/ (function(module, exports) {
+
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+
+/***/ }),
+/* 18 */
+/***/ (function(module, exports) {
+
+exports.endianness = function () { return 'LE' };
+
+exports.hostname = function () {
+    if (typeof location !== 'undefined') {
+        return location.hostname
+    }
+    else return '';
+};
+
+exports.loadavg = function () { return [] };
+
+exports.uptime = function () { return 0 };
+
+exports.freemem = function () {
+    return Number.MAX_VALUE;
+};
+
+exports.totalmem = function () {
+    return Number.MAX_VALUE;
+};
+
+exports.cpus = function () { return [] };
+
+exports.type = function () { return 'Browser' };
+
+exports.release = function () {
+    if (typeof navigator !== 'undefined') {
+        return navigator.appVersion;
+    }
+    return '';
+};
+
+exports.networkInterfaces
+= exports.getNetworkInterfaces
+= function () { return {} };
+
+exports.arch = function () { return 'javascript' };
+
+exports.platform = function () { return 'browser' };
+
+exports.tmpdir = exports.tmpDir = function () {
+    return '/tmp';
+};
+
+exports.EOL = '\n';
+
+
+/***/ }),
 /* 19 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -65465,7 +65492,7 @@ module.exports = {
  /* eslint-env node */
 
 
-var SDPUtils = __webpack_require__(5);
+var SDPUtils = __webpack_require__(6);
 
 function writeMediaSection(transceiver, caps, type, stream, dtlsRole) {
   var sdp = SDPUtils.writeRtpDescription(transceiver.kind, caps);
@@ -67817,7 +67844,7 @@ module.exports = {
  /* eslint-env node */
 
 
-var SDPUtils = __webpack_require__(5);
+var SDPUtils = __webpack_require__(6);
 var utils = __webpack_require__(0);
 
 // Wraps the peerconnection event eventNameToWrap in a function
