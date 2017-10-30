@@ -87,7 +87,7 @@ AFRAME.registerComponent('wevr-player', {
   init() {
     this.system = this.el.sceneEl.systems.wevr;
 
-    this.setPosition(this.el.parentNode);
+    this.setInitialPosition(this.el.parentNode);
     this.el.object3D.updateMatrixWorld();
     this.position = this.el.object3D.getWorldPosition();
     this.quaternion = this.el.object3D.getWorldQuaternion();
@@ -100,7 +100,7 @@ AFRAME.registerComponent('wevr-player', {
     });
   },
 
-  setPosition(el) {
+  setInitialPosition(el) {
     var center = {x: 0, y: 0, z: 0};
     let radius = 3;
 

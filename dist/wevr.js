@@ -18332,7 +18332,7 @@ AFRAME.registerComponent('wevr-player', {
       var position = this.el.object3D.getWorldPosition();
       var quaternion = this.el.object3D.getWorldQuaternion();
 
-      if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+      if (!__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.quaternion, quaternion)) {
         this.system.channels.broadcast("wevr.movement", {position: position, quaternion: quaternion});
         this.position = position;
         this.quaternion = quaternion;
@@ -18411,7 +18411,7 @@ AFRAME.registerComponent('wevr-player-hand', {
         var position = this.el.object3D.getWorldPosition();
         var quaternion = this.el.object3D.getWorldQuaternion();
 
-        if (!__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash__["isEqual"](this.quaternion, quaternion)) {
+        if (!__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.position, position) || !__WEBPACK_IMPORTED_MODULE_0_lodash___default()(this.quaternion, quaternion)) {
           this.system.channels.broadcast("wevr.movement.hands." + this.data, {
             position: position,
             quaternion: quaternion
@@ -18625,7 +18625,7 @@ AFRAME.registerSystem('wevr', {
           } else {
             this.signaller.signal({
               event: "wevr.peer-ping-failure",
-              data: __WEBPACK_IMPORTED_MODULE_8_lodash__["difference"](self.pingRecpients, self.pingReplies)
+              data: __WEBPACK_IMPORTED_MODULE_8_lodash___default()(self.pingRecpients, self.pingReplies)
             })
           }
         }
