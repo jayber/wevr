@@ -34,9 +34,9 @@ Please be aware that at the moment
 1. Add teleportation to movement options
 1. Ability to set wevr origin, so that player and avatars are spawned around that point in scene, rather than always 0,0,0
 1. Complete device support
-   2. Daydream?
-   2. Movement for GearVR and mobile 2D
-   2. Vive testing
+    1. Daydream?
+    1. Movement for GearVR and mobile 2D
+    1. Vive testing
 1. Refactoring to support use as code library
 1. Get avatars and/or avatar settings from user account on server
 
