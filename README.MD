@@ -23,24 +23,24 @@ By default wevr uses the wevr-server hosted by VRLobby.co
 
 www.vrlobby.co
 
-##Important Omissions
+## Important Omissions
 Please be aware that at the moment
 * Movement is restricted to a single plane on the vertical axis
 * Not all features will work or have been tested on all available devices
 
-##Features under consideration
+## Features under consideration
 1. Ability to override avatar and player elements
 1. Add terrain tracking to movement, so users' location is automatically effected by ground elevation
 1. Add teleportation to movement options
 1. Ability to set wevr origin, so that player and avatars are spawned around that point in scene, rather than always 0,0,0
 1. Complete device support
-  1. Daydream?
-  1. Movement for GearVR and mobile 2D
-  1. Vive testing
+  2. Daydream?
+  2. Movement for GearVR and mobile 2D
+  2. Vive testing
 1. Refactoring to support use as code library
 1. Get avatars and/or avatar settings from user account on server
 
-##Usage notes
+## Usage notes
 * As soon as you give permission to the browser to use your microphone it's possible for someone else to be linked with you
 and hear what you're saying / doing etc EVEN DURING LOCAL DEVELOPMENT. I will be adding server logic to prevent all `localhost` or `127.0.0.1` or other
  non public addresses from forming the same room, but be aware. At the moment there's nothing to prevent someone faking
