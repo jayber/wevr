@@ -42,9 +42,9 @@ Please be aware that at the moment
 
 ## Usage notes
 * As soon as you give permission to the browser to use your microphone it's possible for someone else to be linked with you
-and hear what you're saying / doing etc EVEN DURING LOCAL DEVELOPMENT. I will be adding server logic to prevent all `localhost` or `127.0.0.1` or other
- non public addresses from forming the same room, but be aware. At the moment there's nothing to prevent someone faking
- an origin address and listening in to an open browser tab.
+and hear what you're saying / doing. This is especially to be noted during local development, since the wevr library will still
+be using the public wevr.vrlobby.co server unless you have specified another. The server will attempt to make unique room
+names for requests coming from local or private ips using information in headers and remote address, but be aware.
 * Currently Chrome will not allow pages from non-secure (i.e. non https) origins access to the microphone (except for local addresses).
 
 Please email me at vrlobby.co@gmail.com with questions, comments, abuse, love notes etc :-D
