@@ -63014,9 +63014,8 @@ AFRAME.registerSystem('wevr', {
 
 class SignallingClient {
 
-  constructor(host = "wss://wevr.vrlobby.co", roomId = (location.hostname+location.pathname).replace(/\//g,"_")) {
+  constructor(host = "wss://wevr.vrlobby.co") {
     this.host = host;
-    this.roomId = roomId;
     this.secondsTilRetry = 2;
     this.listeners = {};
   }
@@ -63025,7 +63024,7 @@ class SignallingClient {
     if (this.ws) {
       this.close();
     }
-    this.ws = this.connect(this.host, this.roomId);
+    this.ws = this.connect(this.host);
   }
 
   close() {
@@ -63034,8 +63033,8 @@ class SignallingClient {
     }
   }
 
-  connect(host, roomId) {
-    let ws = new WebSocket(`${host}/${roomId}`);
+  connect(host) {
+    let ws = new WebSocket(host);
     ws.onclose = () => {
       if (this.secondsTilRetry < 33) {
         this.secondsTilRetry = this.secondsTilRetry * 2;
@@ -63143,7 +63142,7 @@ class RTCConnectionBroker {
     this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
-    this.candidates = {}
+    this.candidates = {};
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });

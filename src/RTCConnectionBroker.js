@@ -32,7 +32,7 @@ class RTCConnectionBroker {
     this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
-    this.candidates = {}
+    this.candidates = {};
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });
