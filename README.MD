@@ -35,7 +35,7 @@ Please be aware that at the moment
 
 ## Features under consideration
 1. Ability to override avatar and player elements
-1. Add terrain tracking to movement, so users' location is automatically effected by ground elevation
+1. Add terrain tracking to movement, so users' location is automatically affected by ground elevation
 1. Add teleportation to movement options
 1. Ability to set wevr origin, so that player and avatars are spawned around that point in scene, rather than always 0,0,0
 1. Complete device support
@@ -55,12 +55,12 @@ names for requests coming from local or private ips using information in headers
 ## Avatar overriding
 Wevr is intended to give developers access to multi-user without having to create their own avatars, and for users of your
 site to set their own avatar preferences and even custom avatars (using e.g. vrlobby.co) that get used on all
-the wevr enable sites they visit, without you having to build an avatar customisation process.
+the wevr enabled sites, without you having to build an avatar customisation process.
 
 However this doesn't stop you from overriding user avatars if you wish.
 To specify an avatar template, add a `avatarTemplate` property to the `wevr` component.
 
-    <a-scene wevr="avatarTemplate:#avatarTemplate;avatarRHTemplate:#avatarHandTemplate;avatarLHTemplate:#avatarHandTemplate">
+    <a-scene wevr="avatarTemplate:#avatarTemplate; avatarRHTemplate:#avatarHandTemplate; avatarLHTemplate:#avatarHandTemplate">
 
 The value you supply is a selector to a `<script>` element contained within the `<assets>` element of your scene.
 As you can see, you can also specify a template for each hand using `avatarRHTemplate` and `avatarLHTemplate`. If you want
