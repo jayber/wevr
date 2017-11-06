@@ -23,6 +23,11 @@ By default wevr uses the wevr-server hosted by VRLobby.co
 
 www.vrlobby.co
 
+Alternatively, if you want to set properties for wevr to use, add the `wevr` component to your `<a-scene>`:
+
+    <a-scene wevr="signalUrl:ws://localhost:9000/wevr">
+
+
 ## Important Omissions
 Please be aware that at the moment
 * Movement is restricted to a single plane on the vertical axis
@@ -41,10 +46,34 @@ Please be aware that at the moment
 1. Get avatars and/or avatar settings from user account on server
 
 ## Usage notes
-* As soon as you give permission to the browser to use your microphone it's possible for someone else to be linked with you
+* As soon as you give permission to the browser to use your microphone it is possible for someone else to be linked with you
 and hear what you're saying / doing. This is especially to be noted during local development, since the wevr library will still
 be using the public wevr.vrlobby.co server unless you have specified another. The server will attempt to make unique room
 names for requests coming from local or private ips using information in headers and remote address, but be aware.
 * Currently Chrome will not allow pages from non-secure (i.e. non https) origins access to the microphone (except for local addresses).
+
+## Avatar overriding
+Wevr is intended to give developers access to multi-user without having to create their own avatars, and for users of your
+site to set their own avatar preferences and even custom avatars (using e.g. vrlobby.co) that get used on all
+the wevr enable sites they visit, without you having to build an avatar customisation process.
+
+However this doesn't stop you from overriding user avatars if you wish.
+To specify an avatar template, add a `avatarTemplate` property to the `wevr` component.
+
+    <a-scene wevr="avatarTemplate:#avatarTemplate;avatarRHTemplate:#avatarHandTemplate;avatarLHTemplate:#avatarHandTemplate">
+
+The value you supply is a selector to a `<script>` element contained within the `<assets>` element of your scene.
+As you can see, you can also specify a template for each hand using `avatarRHTemplate` and `avatarLHTemplate`. If you want
+to use the same template for both hands, wevr automatically sets a `rotation` substitution variable which will correct for
+right hand rotation weirdness. Use it like this:
+
+    <a-sphere color="#5985ff" radius="0.1" ${rotation}>
+
+Wevr uses the [template component](https://github.com/ngokevin/kframe/tree/master/components/template). Check out the documentation there for
+usage.
+
+
+Take a look at the [index example](/index.html) to see how to use all these features.
+
 
 Please email me at vrlobby.co@gmail.com with questions, comments, abuse, love notes etc :-D

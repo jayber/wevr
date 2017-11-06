@@ -13,6 +13,9 @@ AFRAME.registerSystem('wevr', {
   schema: {
     period: {default: 100},
     signalUrl: {default: 'wss://wevr.vrlobby.co/wevr'},
+    avatarTemplate: {default: ''},
+    avatarRHTemplate: {default: ''},
+    avatarLHTemplate: {default: ''},
     startOnLoad: {default: false}
   },
 
@@ -135,6 +138,9 @@ AFRAME.registerSystem('wevr', {
   setUpAvatars(channels, sceneEl) {
     channels.addEventListener("open", (data, peer) => {
       let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
+      if (this.data.avatarTemplate) {
+        element.setAttribute('template','src:'+this.data.avatarTemplate)
+      }
 
       channels.addEventListenerForPeer(peer, "wevr.movement-init", (event) => {
         element.object3D.position.copy(new THREE.Vector3(event.position.x, event.position.y, event.position.z));
@@ -144,6 +150,11 @@ AFRAME.registerSystem('wevr', {
 
       channels.addEventListenerForPeer(peer, `wevr.movement-init.hand`, (event) => {
         let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar-hand", `peer:${peer};hand:${event.hand}`);
+        if (event.hand == 'right' && this.data.avatarRHTemplate) {
+          element.setAttribute('template','src:'+this.data.avatarRHTemplate)
+        } else if (this.data.avatarLHTemplate) {
+          element.setAttribute('template','src:'+this.data.avatarLHTemplate)
+        }
         var object3D = element.object3D;
         object3D.position.copy(new THREE.Vector3(event.position.x, event.position.y, event.position.z));
         object3D.quaternion.copy(new THREE.Quaternion(event.quaternion._x, event.quaternion._y, event.quaternion._z, event.quaternion._w));

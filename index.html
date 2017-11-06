@@ -68,7 +68,55 @@
     </script>
 </head>
 <body>
-<a-scene wevr="signalUrl:ws://localhost:9000/wevr">
+<a-scene wevr="signalUrl:ws://localhost:9000/wevr;avatarTemplate:#avatarTemplate;avatarRHTemplate:#avatarHandTemplate;avatarLHTemplate:#avatarHandTemplate">
+    <assets>
+        <script id="avatarHandTemplate" type="text/html">
+        <a-sphere color="#ff8888" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+            <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#88ff88" radius="0.1"></a-sphere>
+            <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#88ff88" radius="0.1"></a-sphere>
+            <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#88ff88" radius="0.1"></a-sphere>
+        </a-sphere>
+        </script>
+
+        <script id="avatarTemplate" type="text/html">
+            <a-sphere class="head"
+            color="#88ff88"
+            position="0 -0.05 0"
+            scale="0.25 0.3 0.2">
+
+            <a-entity class="face"
+            position="0 0 -0.6">
+            <a-sphere position="0 0.05 -0.4"
+            color="#5985ff"
+            scale="0.18 0.18 0.18">
+            </a-sphere>
+            <a-sphere class="eye"
+            color="#efefef"
+            position="0.3 0.35 -0.3"
+            scale="0.15 0.15 0.15"
+            >
+            <a-sphere class="pupil"
+            color="#000"
+            position="0 0 -1"
+            scale="0.45 0.45 0.45"
+            ></a-sphere>
+            </a-sphere>
+            <a-sphere class="eye"
+            color="#efefef"
+            position="-0.3 0.35 -0.3"
+            scale="0.15 0.15 0.15"
+            >
+            <a-sphere class="pupil"
+            color="#000"
+            position="0 0 -1"
+            scale="0.45 0.45 0.45"
+            ></a-sphere>
+            </a-sphere>
+            </a-entity>
+
+            </a-sphere>
+        </script>
+    </assets>
 
     <a-entity id="environment" environment="preset:japan"></a-entity>
 

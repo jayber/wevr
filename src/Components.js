@@ -6,7 +6,8 @@ import * as THREE from 'three';
 AFRAME.registerComponent('wevr-avatar', {
   schema: {type: "string"},
   init() {
-    this.el.innerHTML = `<a-sphere class="head"
+    if (!this.el.hasAttribute('template')) {
+      this.el.innerHTML = `<a-sphere class="head"
                           color="#5985ff"
                           position="0 -0.05 0"
                           scale="0.25 0.3 0.2">
@@ -43,6 +44,7 @@ AFRAME.registerComponent('wevr-avatar', {
 
                 </a-sphere>
                 `;
+    }
     this.system = this.el.sceneEl.systems.wevr;
 
     var channels = this.system.channels;
@@ -67,13 +69,17 @@ AFRAME.registerComponent('wevr-avatar-hand', {
     hand: {type: "string"}
   },
   init() {
-    var rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
+    let rotation = this.data.hand.toLowerCase() == "right" ? 'rotation="0 0 180"' : '';
 
-    this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
+    if (this.el.hasAttribute('template')) {
+      this.el.setAttribute('data-rotation', rotation);
+    } else {
+      this.el.innerHTML = `<a-sphere color="#5985ff" radius="0.1" ${rotation}><a-sphere position="0.09 0 0.02" scale="0.5 0.5 0.5" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0 0 -0.075" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="0.05  0 -0.075" rotation="0 -20 0" scale="0.35 0.35 1" color="#5985ff" radius="0.1"></a-sphere>
     <a-sphere position="-0.05 0 -0.075" rotation="0 20 0" scale="0.25 0.25 0.75" color="#5985ff" radius="0.1"></a-sphere>
     </a-sphere>`;
+    }
 
     this.system = this.el.sceneEl.systems.wevr;
     var channels = this.system.channels;
