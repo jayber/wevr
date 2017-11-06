@@ -5,34 +5,13 @@ export default
 class RTCConnectionBroker {
 
   constructor(signallingClient) {
-
-    this.iceConfiguration = {
-      iceServers: [{
-        urls: [
-          "stun:stun.l.google.com:19302"
-        ]
-      }, {
-        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
-        credential: "noone",
-        username: "none"
-      }]
-    };
-
-    let constraints = {audio: true, video: false};
-    var self = this;
-    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
-      self.audioState = 'success';
-      self.onaudio();
-      return audio;
-    }).catch((e) => {
-      log.error(e);
-      self.audioState = 'mute';
-      self.onaudio();
-    });
-    this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
     this.candidates = {};
+    this.requestMicrophone();
+    this.listen("wevr.ice-config", (data) => {
+      this.iceConfiguration = data;
+    });
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });
@@ -58,6 +37,21 @@ class RTCConnectionBroker {
       log.info(`I am ${data}`);
       window.wevr.id = data;
     });
+  }
+
+  requestMicrophone() {
+    let self = this;
+    let constraints = {audio: true, video: false};
+    self.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
+      self.audioState = 'success';
+      self.onaudio();
+      return audio;
+    }).catch((e) => {
+      log.error(e);
+      self.audioState = 'mute';
+      self.onaudio();
+    });
+    this.audioState = 'requesting';
   }
 
   listen(event, listener) {
@@ -210,5 +204,12 @@ class RTCConnectionBroker {
 
   reconnect() {
     this.onreconnect();
+  }
+
+  sendPeerPingFailures(failures) {
+    this.signallingClient.signal({
+      event: "wevr.peer-ping-failure",
+      data: failures
+    });
   }
 }

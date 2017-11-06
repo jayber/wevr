@@ -12,13 +12,52 @@ class DataChannels {
     broker.onchannel = (peer, dataChannel) => {
       this.addChannel(peer, dataChannel);
     };
+    this.setUpPeerConnectionChecks(broker);
   }
 
   addChannel(peer, dataChannel) {
     this.channels[peer] = dataChannel;
     this.registerChannelHandlers(dataChannel, peer);
-    this.dispatch({event: "open"},peer);
-    dataChannel.send(JSON.stringify({event: "ready"}));
+    this.dispatch({event: "wevr.open"},peer);
+    dataChannel.send(JSON.stringify({event: "wevr.ready"}));
+  }
+
+
+  setUpPeerConnectionChecks(broker) {
+    broker.oncheckconnections = (peers) => {
+      this.checkConnections(peers, broker)
+    };
+    this.addEventListener("wevr.peer-ping", (param, peer) => {
+      this.sendTo(peer, "wevr.peer-ping-reply", {});
+    });
+    broker.onreconnect = () => {
+      log.debug("received reconnect. reloading: " + window.wevr.id);
+      location.reload();
+    }
+  }
+
+  checkConnections(peers, broker) {
+    this.pingReplies = [];
+    this.pingRecpients = peers;
+    var self = this;
+    self.removeAllPeerListeners("wevr.peer-ping-reply");
+    peers.forEach((peer) => {
+      self.addEventListenerForPeer(peer, "wevr.peer-ping-reply",() => {
+        self.pingReplies.push(peer);
+      })
+    });
+    this.broadcast("wevr.peer-ping",{});
+    setTimeout(()=> {
+        if (self.pingRecpients.length != self.pingReplies.length) {
+          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
+            log.debug("no answers, i might be the problem");
+            broker.onreconnect();
+          } else {
+            broker.sendPeerPingFailures( _.difference(self.pingRecpients, self.pingReplies));
+          }
+        }
+      }
+      , 30000);
   }
 
   registerChannelHandlers(channel, peer) {
@@ -33,7 +72,7 @@ class DataChannels {
   messageHandler(event, peer) {
     var msg = JSON.parse(event.data);
     log.trace(peer+" data channel received: " + event.data);
-    if (msg.event === "ready"){
+    if (msg.event === "wevr.ready"){
       this.ready[peer] = true;
     }
     this.dispatch(msg, peer);
@@ -47,8 +86,8 @@ class DataChannels {
       this.peerListeners[peer][type] = [];
     }
     this.peerListeners[peer][type].push(listener);
-    if (type === "ready" && this.ready[peer]) {
-      this.dispatch({event: "ready"}, peer);
+    if (type === "wevr.ready" && this.ready[peer]) {
+      this.dispatch({event: "wevr.ready"}, peer);
     }
   }
 
@@ -63,9 +102,9 @@ class DataChannels {
       this.listeners[type] = [];
     }
     this.listeners[type].push(listener);
-    if (type === "ready") {
+    if (type === "wevr.ready") {
       Object.keys(this.ready).forEach((key)=>{
-        this.dispatch({event: "ready"}, key);
+        this.dispatch({event: "wevr.ready"}, key);
     });
     }
   }

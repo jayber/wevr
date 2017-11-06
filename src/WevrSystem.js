@@ -24,10 +24,10 @@ AFRAME.registerSystem('wevr', {
   },
 
   start() {
-    this.signaller = new SignallingClient(this.data.signalUrl);
-    let broker = new RTCConnectionBroker(this.signaller);
+    let signaller = new SignallingClient(this.data.signalUrl);
+    let broker = new RTCConnectionBroker(signaller);
     this.channels = new DataChannels(broker);
-    this.stateHandler = new StateHandler(this.signaller, this.channels);
+    this.stateHandler = new StateHandler(signaller, this.channels);
     this.positionalAudio = new PositionalAudio();
 
     this.setUpPlayer(this.el.sceneEl);
@@ -36,54 +36,13 @@ AFRAME.registerSystem('wevr', {
 
     this.setUpAvatars(this.channels, this.el.sceneEl);
 
-    this.setUpPeerConnectionChecks(broker, this.channels);
-
     if (this.el.hasLoaded) {
-      this.signaller.start();
+      signaller.start();
     } else {
       this.el.addEventListener("loaded", () => {
-        this.signaller.start();
+        signaller.start();
       });
     }
-  },
-
-  setUpPeerConnectionChecks(broker, channels) {
-    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
-    channels.addEventListener("wevr.peer-ping", (param, peer) => {
-      this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
-    });
-    broker.onreconnect = () => {
-      log.debug("received reconnect. reloading: " + window.wevr.id);
-      location.reload();
-    }
-  },
-
-  checkConnections(peers, broker) {
-    this.pingReplies = [];
-    this.pingRecpients = peers;
-    var self = this;
-    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
-    peers.forEach((peer) => {
-      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
-        self.pingReplies.push(peer);
-      })
-    });
-    this.channels.broadcast("wevr.peer-ping",{});
-    setTimeout(()=> {
-        if (self.pingRecpients.length != self.pingReplies.length) {
-          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
-            log.debug("no answers, i might be the problem");
-            broker.onreconnect();
-          } else {
-            this.signaller.signal({
-              event: "wevr.peer-ping-failure",
-              data: _.difference(self.pingRecpients, self.pingReplies)
-            })
-          }
-        }
-      }
-      , 30000);
-
   },
 
   setUpPlayer(sceneEl) {
@@ -136,7 +95,7 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpAvatars(channels, sceneEl) {
-    channels.addEventListener("open", (data, peer) => {
+    channels.addEventListener("wevr.open", (data, peer) => {
       let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
       if (this.data.avatarTemplate) {
         element.setAttribute('template','src:'+this.data.avatarTemplate)

@@ -61704,13 +61704,52 @@ class DataChannels {
     broker.onchannel = (peer, dataChannel) => {
       this.addChannel(peer, dataChannel);
     };
+    this.setUpPeerConnectionChecks(broker);
   }
 
   addChannel(peer, dataChannel) {
     this.channels[peer] = dataChannel;
     this.registerChannelHandlers(dataChannel, peer);
-    this.dispatch({event: "open"},peer);
-    dataChannel.send(JSON.stringify({event: "ready"}));
+    this.dispatch({event: "wevr.open"},peer);
+    dataChannel.send(JSON.stringify({event: "wevr.ready"}));
+  }
+
+
+  setUpPeerConnectionChecks(broker) {
+    broker.oncheckconnections = (peers) => {
+      this.checkConnections(peers, broker)
+    };
+    this.addEventListener("wevr.peer-ping", (param, peer) => {
+      this.sendTo(peer, "wevr.peer-ping-reply", {});
+    });
+    broker.onreconnect = () => {
+      __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("received reconnect. reloading: " + window.wevr.id);
+      location.reload();
+    }
+  }
+
+  checkConnections(peers, broker) {
+    this.pingReplies = [];
+    this.pingRecpients = peers;
+    var self = this;
+    self.removeAllPeerListeners("wevr.peer-ping-reply");
+    peers.forEach((peer) => {
+      self.addEventListenerForPeer(peer, "wevr.peer-ping-reply",() => {
+        self.pingReplies.push(peer);
+      })
+    });
+    this.broadcast("wevr.peer-ping",{});
+    setTimeout(()=> {
+        if (self.pingRecpients.length != self.pingReplies.length) {
+          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
+            __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].debug("no answers, i might be the problem");
+            broker.onreconnect();
+          } else {
+            broker.sendPeerPingFailures( _.difference(self.pingRecpients, self.pingReplies));
+          }
+        }
+      }
+      , 30000);
   }
 
   registerChannelHandlers(channel, peer) {
@@ -61725,7 +61764,7 @@ class DataChannels {
   messageHandler(event, peer) {
     var msg = JSON.parse(event.data);
     __WEBPACK_IMPORTED_MODULE_0__Utils__["a" /* default */].trace(peer+" data channel received: " + event.data);
-    if (msg.event === "ready"){
+    if (msg.event === "wevr.ready"){
       this.ready[peer] = true;
     }
     this.dispatch(msg, peer);
@@ -61739,8 +61778,8 @@ class DataChannels {
       this.peerListeners[peer][type] = [];
     }
     this.peerListeners[peer][type].push(listener);
-    if (type === "ready" && this.ready[peer]) {
-      this.dispatch({event: "ready"}, peer);
+    if (type === "wevr.ready" && this.ready[peer]) {
+      this.dispatch({event: "wevr.ready"}, peer);
     }
   }
 
@@ -61755,9 +61794,9 @@ class DataChannels {
       this.listeners[type] = [];
     }
     this.listeners[type].push(listener);
-    if (type === "ready") {
+    if (type === "wevr.ready") {
       Object.keys(this.ready).forEach((key)=>{
-        this.dispatch({event: "ready"}, key);
+        this.dispatch({event: "wevr.ready"}, key);
     });
     }
   }
@@ -62753,7 +62792,7 @@ AFRAME.registerComponent('wevr-player', {
     this.quaternion = this.el.object3D.getWorldQuaternion();
     this.period = this.system.data.period;
 
-    this.system.channels.addEventListener("ready", (data, peer) => {
+    this.system.channels.addEventListener("wevr.ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
       __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].debug("init movement: " + peer, false);
     });
@@ -62822,7 +62861,7 @@ AFRAME.registerComponent('wevr-player-hand', {
       this.quaternion = this.el.object3D.getWorldQuaternion();
       this.period = this.system.data.period;
 
-      this.system.channels.addEventListener("ready", (data, peer) => {
+      this.system.channels.addEventListener("wevr.ready", (data, peer) => {
         this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
           hand: this.data,
           position: this.position,
@@ -63023,10 +63062,10 @@ AFRAME.registerSystem('wevr', {
   },
 
   start() {
-    this.signaller = new __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__["a" /* default */](this.data.signalUrl);
-    let broker = new __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__["a" /* default */](this.signaller);
+    let signaller = new __WEBPACK_IMPORTED_MODULE_0__SignallingClient_js__["a" /* default */](this.data.signalUrl);
+    let broker = new __WEBPACK_IMPORTED_MODULE_1__RTCConnectionBroker_js__["a" /* default */](signaller);
     this.channels = new __WEBPACK_IMPORTED_MODULE_3__DataChannels_js__["a" /* default */](broker);
-    this.stateHandler = new __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__["a" /* default */](this.signaller, this.channels);
+    this.stateHandler = new __WEBPACK_IMPORTED_MODULE_2__StateHandler_js__["a" /* default */](signaller, this.channels);
     this.positionalAudio = new __WEBPACK_IMPORTED_MODULE_4__PositionalAudio_js__["a" /* default */]();
 
     this.setUpPlayer(this.el.sceneEl);
@@ -63035,54 +63074,13 @@ AFRAME.registerSystem('wevr', {
 
     this.setUpAvatars(this.channels, this.el.sceneEl);
 
-    this.setUpPeerConnectionChecks(broker, this.channels);
-
     if (this.el.hasLoaded) {
-      this.signaller.start();
+      signaller.start();
     } else {
       this.el.addEventListener("loaded", () => {
-        this.signaller.start();
+        signaller.start();
       });
     }
-  },
-
-  setUpPeerConnectionChecks(broker, channels) {
-    broker.oncheckconnections = (peers) => {this.checkConnections(peers, broker)};
-    channels.addEventListener("wevr.peer-ping", (param, peer) => {
-      this.channels.sendTo(peer, "wevr.peer-ping-reply", {});
-    });
-    broker.onreconnect = () => {
-      __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("received reconnect. reloading: " + window.wevr.id);
-      location.reload();
-    }
-  },
-
-  checkConnections(peers, broker) {
-    this.pingReplies = [];
-    this.pingRecpients = peers;
-    var self = this;
-    self.channels.removeAllPeerListeners("wevr.peer-ping-reply");
-    peers.forEach((peer) => {
-      self.channels.addEventListenerForPeer(peer, "wevr.peer-ping-reply",(param) => {
-        self.pingReplies.push(peer);
-      })
-    });
-    this.channels.broadcast("wevr.peer-ping",{});
-    setTimeout(()=> {
-        if (self.pingRecpients.length != self.pingReplies.length) {
-          if (self.pingReplies.length == 0 && self.pingRecpients.length > 1) {
-            __WEBPACK_IMPORTED_MODULE_6__Utils__["a" /* default */].debug("no answers, i might be the problem");
-            broker.onreconnect();
-          } else {
-            this.signaller.signal({
-              event: "wevr.peer-ping-failure",
-              data: __WEBPACK_IMPORTED_MODULE_8_lodash__["difference"](self.pingRecpients, self.pingReplies)
-            })
-          }
-        }
-      }
-      , 30000);
-
   },
 
   setUpPlayer(sceneEl) {
@@ -63135,7 +63133,7 @@ AFRAME.registerSystem('wevr', {
   },
 
   setUpAvatars(channels, sceneEl) {
-    channels.addEventListener("open", (data, peer) => {
+    channels.addEventListener("wevr.open", (data, peer) => {
       let element = this.createAvatarElement(peer, sceneEl, "wevr-avatar", peer);
       if (this.data.avatarTemplate) {
         element.setAttribute('template','src:'+this.data.avatarTemplate)
@@ -63330,34 +63328,13 @@ class SignallingClient {
 class RTCConnectionBroker {
 
   constructor(signallingClient) {
-
-    this.iceConfiguration = {
-      iceServers: [{
-        urls: [
-          "stun:stun.l.google.com:19302"
-        ]
-      }, {
-        urls: "turn:ec2-54-74-139-199.eu-west-1.compute.amazonaws.com:3478",
-        credential: "noone",
-        username: "none"
-      }]
-    };
-
-    let constraints = {audio: true, video: false};
-    var self = this;
-    this.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
-      self.audioState = 'success';
-      self.onaudio();
-      return audio;
-    }).catch((e) => {
-      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(e);
-      self.audioState = 'mute';
-      self.onaudio();
-    });
-    this.audioState = 'requesting';
     this.signallingClient = signallingClient;
     this.connections = {};
     this.candidates = {};
+    this.requestMicrophone();
+    this.listen("wevr.ice-config", (data) => {
+      this.iceConfiguration = data;
+    });
     this.listen("wevr.connect", (data) => {
       this.connectTo(data);
     });
@@ -63383,6 +63360,21 @@ class RTCConnectionBroker {
       __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].info(`I am ${data}`);
       window.wevr.id = data;
     });
+  }
+
+  requestMicrophone() {
+    let self = this;
+    let constraints = {audio: true, video: false};
+    self.audio = navigator.mediaDevices.getUserMedia(constraints).then((audio) => {
+      self.audioState = 'success';
+      self.onaudio();
+      return audio;
+    }).catch((e) => {
+      __WEBPACK_IMPORTED_MODULE_1__Utils__["a" /* default */].error(e);
+      self.audioState = 'mute';
+      self.onaudio();
+    });
+    this.audioState = 'requesting';
   }
 
   listen(event, listener) {
@@ -63535,6 +63527,13 @@ class RTCConnectionBroker {
 
   reconnect() {
     this.onreconnect();
+  }
+
+  sendPeerPingFailures(failures) {
+    this.signallingClient.signal({
+      event: "wevr.peer-ping-failure",
+      data: failures
+    });
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = RTCConnectionBroker;

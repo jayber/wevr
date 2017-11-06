@@ -107,7 +107,7 @@ AFRAME.registerComponent('wevr-player', {
     this.quaternion = this.el.object3D.getWorldQuaternion();
     this.period = this.system.data.period;
 
-    this.system.channels.addEventListener("ready", (data, peer) => {
+    this.system.channels.addEventListener("wevr.ready", (data, peer) => {
       this.system.channels.sendTo(peer, "wevr.movement-init", {position: this.position, quaternion: this.quaternion});
       log.debug("init movement: " + peer, false);
     });
@@ -176,7 +176,7 @@ AFRAME.registerComponent('wevr-player-hand', {
       this.quaternion = this.el.object3D.getWorldQuaternion();
       this.period = this.system.data.period;
 
-      this.system.channels.addEventListener("ready", (data, peer) => {
+      this.system.channels.addEventListener("wevr.ready", (data, peer) => {
         this.system.channels.sendTo(peer, `wevr.movement-init.hand`, {
           hand: this.data,
           position: this.position,
